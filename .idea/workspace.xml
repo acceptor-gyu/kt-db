@@ -5,10 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="deedb7aa-762a-45da-a9f9-c54ec1c0e049" name="변경" comment="">
-      <change afterPath="$PROJECT_DIR$/.claude/agents/playwright-test-generator.agent.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.claude/agents/playwright-test-healer.agent.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.claude/agents/playwright-test-planner.agent.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.claude/workflows/copilot-setup-steps.yml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/kotlin/study/db/storage_engine/FieldEncorder.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/kotlin/study/db/storage_engine/Page.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/kotlin/study/db/storage_engine/PageManager.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -25,6 +24,7 @@
     <option name="RECENT_TEMPLATES">
       <list>
         <option value="Kotlin Data Class" />
+        <option value="Class" />
         <option value="Kotlin Class" />
       </list>
     </option>
@@ -49,7 +49,7 @@
     "RequestMappingsPanelWidth1": "75",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "Spring Boot.DbApplication.executor": "Run",
-    "git-widget-placeholder": "crud-controller",
+    "git-widget-placeholder": "storage-engine-file-io",
     "kotlin-language-version-configured": "true",
     "last_opened_file_path": "/Users/luke-gyu/dev/study/db",
     "node.js.detected.package.eslint": "true",
