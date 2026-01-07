@@ -12,12 +12,13 @@ class TableService {
     fun createTable(request: CreateTableRequest): String {
         // 테이블 생성 로직
         val table = Table(
-            name = request.name,
-            columns = request.columns
+            tableName = request.tableName,
+            dataType = request.columns ?: emptyMap(),
+            value = request.values ?: emptyMap()
         )
-        
-        tables[request.name] = table
-        
+
+        tables[request.tableName] = table
+
         return buildCreateTableQuery(table)
     }
 
@@ -34,9 +35,9 @@ class TableService {
     }
 
     private fun buildCreateTableQuery(table: Table): String {
-        val columnsDefinition = table.columns.joinToString(", ") { 
-            "${it.name} ${it.dataType}" 
+        val columnsDefinition = table.dataType.entries.joinToString(", ") {
+            "${it.key} ${it.value}"
         }
-        return "CREATE TABLE ${table.name} ($columnsDefinition)"
+        return "CREATE TABLE ${table.tableName} ($columnsDefinition)"
     }
 }
