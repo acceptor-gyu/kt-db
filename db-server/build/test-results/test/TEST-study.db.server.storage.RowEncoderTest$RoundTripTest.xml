@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="왕복(Round-trip) 테스트" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-01-07T07:39:31.602Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.001">
+  <properties/>
+  <testcase name="encodeRow 후 decodeRow하면 원본 배열 복원" classname="study.db.server.storage.RowEncoderTest$RoundTripTest" time="0.0"/>
+  <testcase name="큰 Row 인코딩/디코딩" classname="study.db.server.storage.RowEncoderTest$RoundTripTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

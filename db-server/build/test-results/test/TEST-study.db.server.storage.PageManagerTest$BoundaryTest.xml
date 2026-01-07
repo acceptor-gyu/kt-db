@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="경계값 테스트" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-01-07T07:39:31.499Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.017">
+  <properties/>
+  <testcase name="정확히 2페이지 크기 파일" classname="study.db.server.storage.PageManagerTest$BoundaryTest" time="0.01"/>
+  <testcase name="단일 페이지 파일 경계 테스트" classname="study.db.server.storage.PageManagerTest$BoundaryTest" time="0.004"/>
+  <testcase name="페이지 수 계산 검증" classname="study.db.server.storage.PageManagerTest$BoundaryTest" time="0.003"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

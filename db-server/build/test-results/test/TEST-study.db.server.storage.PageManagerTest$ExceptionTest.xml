@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="예외 처리 테스트" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-01-07T07:39:31.522Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.016">
+  <properties/>
+  <testcase name="Int.MAX_VALUE 페이지 ID 접근 시 예외" classname="study.db.server.storage.PageManagerTest$ExceptionTest" time="0.001"/>
+  <testcase name="범위 외 페이지 ID 접근 시 예외 메시지 검증" classname="study.db.server.storage.PageManagerTest$ExceptionTest" time="0.007"/>
+  <testcase name="readAll() 전에 readAt() 호출 시 IllegalArgumentException" classname="study.db.server.storage.PageManagerTest$ExceptionTest" time="0.002"/>
+  <testcase name="정확히 경계값에서 예외 발생" classname="study.db.server.storage.PageManagerTest$ExceptionTest" time="0.004"/>
+  <testcase name="음수 페이지 ID 접근 시 예외" classname="study.db.server.storage.PageManagerTest$ExceptionTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
