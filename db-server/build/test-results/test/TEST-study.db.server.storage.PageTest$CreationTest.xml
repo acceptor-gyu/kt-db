@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="생성 테스트" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-01-07T07:39:31.583Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.002">
-  <properties/>
-  <testcase name="큰 데이터로 생성" classname="study.db.server.storage.PageTest$CreationTest" time="0.001"/>
-  <testcase name="기본 생성" classname="study.db.server.storage.PageTest$CreationTest" time="0.0"/>
-  <testcase name="빈 데이터로 생성" classname="study.db.server.storage.PageTest$CreationTest" time="0.001"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>
