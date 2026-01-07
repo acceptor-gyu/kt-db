@@ -7,4 +7,17 @@ package study.db.storage_engine
 data class Page(
     val id: Int,
     val data: ByteArray
-)
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is Page) return false
+
+        return id == other.id && data.contentEquals(other.data)
+    }
+
+    override fun hashCode(): Int {
+        var result = id
+        result = 31 * result + data.contentHashCode()
+        return result
+    }
+}

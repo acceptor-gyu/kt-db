@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta http-equiv="x-ua-compatible" content="IE=edge"/>
+<title>Test results - PageManager 메모리 로딩 데모</title>
+<link href="../css/base-style.css" rel="stylesheet" type="text/css"/>
+<link href="../css/style.css" rel="stylesheet" type="text/css"/>
+<script src="../js/report.js" type="text/javascript"></script>
+</head>
+<body>
+<div id="content">
+<h1>PageManager 메모리 로딩 데모</h1>
+<div class="breadcrumbs">
+<a href="../index.html">all</a> &gt; 
+<a href="../packages/study.db.storage_engine.html">study.db.storage_engine</a> &gt; PageManagerMemoryDemoTest</div>
+<div id="summary">
+<table>
+<tr>
+<td>
+<div class="summaryGroup">
+<table>
+<tr>
+<td>
+<div class="infoBox" id="tests">
+<div class="counter">3</div>
+<p>tests</p>
+</div>
+</td>
+<td>
+<div class="infoBox" id="failures">
+<div class="counter">0</div>
+<p>failures</p>
+</div>
+</td>
+<td>
+<div class="infoBox" id="ignored">
+<div class="counter">0</div>
+<p>ignored</p>
+</div>
+</td>
+<td>
+<div class="infoBox" id="duration">
+<div class="counter">0.072s</div>
+<p>duration</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+</td>
+<td>
+<div class="infoBox success" id="successRate">
+<div class="percent">100%</div>
+<p>successful</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="tab-container">
+<ul class="tabLinks">
+<li>
+<a href="#">Tests</a>
+</li>
+<li>
+<a href="#">Standard output</a>
+</li>
+</ul>
+<div class="tab">
+<h2>Tests</h2>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>Method name</th>
+<th>Duration</th>
+<th>Result</th>
+</tr>
+</thead>
+<tr>
+<td class="success">Page 객체 구조 시각화</td>
+<td class="success">visualize Page object structure()</td>
+<td class="success">0.008s</td>
+<td class="success">passed</td>
+</tr>
+<tr>
+<td class="success">partial_page.dat 메모리 로딩 시각화 (부분 페이지)</td>
+<td class="success">visualize partial_page loading()</td>
+<td class="success">0.042s</td>
+<td class="success">passed</td>
+</tr>
+<tr>
+<td class="success">sample_pages.dat 메모리 로딩 시각화</td>
+<td class="success">visualize sample_pages loading()</td>
+<td class="success">0.022s</td>
+<td class="success">passed</td>
+</tr>
+</table>
+</div>
+<div class="tab">
+<h2>Standard output</h2>
+<span class="code">
+<pre>======================================================================
+&#x1f4c1; 파일: partial_page.dat (24 bytes)
+   ⚠️ 24 bytes = 1.5 pages → 올림하여 2 pages로 처리
+======================================================================
+
+&#x1f4ca; 로드 결과:
+   - pageCount(): 2
+   - 파일 크기: 24 bytes
+   - PAGE_SIZE: 16 bytes
+   - 계산: ceil(24 / 16) = 2 pages
+
+┌─ Page 0
+│  실제 데이터: 16 bytes, 패딩: 0 bytes
+│
+│  Hex: 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
+└──────────────────────────────────────────────────
+
+┌─ Page 1
+│  실제 데이터: 8 bytes, 패딩: 8 bytes
+│
+│  Hex: 10 11 12 13 14 15 16 17 00 00 00 00 00 00 00 00
+│                                00 00 00 00 00 00 00 00 ← 패딩
+└──────────────────────────────────────────────────
+======================================================================
+&#x1f4c1; 파일: sample_pages.dat (96 bytes)
+======================================================================
+
+&#x1f504; readAll() 실행 전:
+   - pageCount(): 0
+   - isLoaded(): false
+
+✅ readAll() 실행 후:
+   - pageCount(): 6
+   - isLoaded(): true
+
+======================================================================
+&#x1f4e6; 메모리에 로드된 Page 구조
+======================================================================
+
+┌─ Page 0 (offset: 0-15)
+│  Size: 16 bytes
+│
+│  Hex:  00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
+│
+│  Dec:    0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15
+│
+│  Char: ................
+└──────────────────────────────────────────────────
+
+┌─ Page 1 (offset: 16-31)
+│  Size: 16 bytes
+│
+│  Hex:  10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F
+│
+│  Dec:   16  17  18  19  20  21  22  23  24  25  26  27  28  29  30  31
+│
+│  Char: ................
+└──────────────────────────────────────────────────
+
+┌─ Page 2 (offset: 32-47)
+│  Size: 16 bytes
+│
+│  Hex:  20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F
+│
+│  Dec:   32  33  34  35  36  37  38  39  40  41  42  43  44  45  46  47
+│
+│  Char: .!&quot;#$%&amp;'()*+,-./
+└──────────────────────────────────────────────────
+
+┌─ Page 3 (offset: 48-63)
+│  Size: 16 bytes
+│
+│  Hex:  30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D 3E 3F
+│
+│  Dec:   48  49  50  51  52  53  54  55  56  57  58  59  60  61  62  63
+│
+│  Char: 0123456789:;&lt;=&gt;?
+└──────────────────────────────────────────────────
+
+┌─ Page 4 (offset: 64-79)
+│  Size: 16 bytes
+│
+│  Hex:  40 41 42 43 44 45 46 47 48 49 4A 4B 4C 4D 4E 4F
+│
+│  Dec:   64  65  66  67  68  69  70  71  72  73  74  75  76  77  78  79
+│
+│  Char: @ABCDEFGHIJKLMNO
+└──────────────────────────────────────────────────
+
+┌─ Page 5 (offset: 80-95)
+│  Size: 16 bytes
+│
+│  Hex:  50 51 52 53 54 55 56 57 58 59 5A 5B 5C 5D 5E 5F
+│
+│  Dec:   80  81  82  83  84  85  86  87  88  89  90  91  92  93  94  95
+│
+│  Char: PQRSTUVWXYZ[.]^_
+└──────────────────────────────────────────────────
+======================================================================
+&#x1f50d; Page 객체 내부 구조
+======================================================================
+
+ Page 객체 (data class):
+ ┌────────────────────────────────────────┐
+ │  id: Int = 0                          │
+ │  data: ByteArray                      │
+ │    ┌─────────────────────────────┐    │
+ │    │ [0]  = 0x00 (0)             │    │
+ │    │ [1]  = 0x01 (1)             │    │
+ │    │ [2]  = 0x02 (2)             │    │
+ │    │ ...                         │    │
+ │    │ [15] = 0x0F (15)            │    │
+ │    └─────────────────────────────┘    │
+ │    size: 16 bytes                      │
+ └────────────────────────────────────────┘
+
+ 메모리 레이아웃:
+
+ pages: MutableList&lt;Page&gt;
+   ├── [0] Page(id=0, data=[00,01,02...0F])
+   ├── [1] Page(id=1, data=[10,11,12...1F])
+   ├── [2] Page(id=2, data=[20,21,22...2F])
+   ├── [3] Page(id=3, data=[30,31,32...3F])
+   ├── [4] Page(id=4, data=[40,41,42...4F])
+   └── [5] Page(id=5, data=[50,51,52...5F])
+
+실제 데이터 검증:
+  Page 0: first=00, last=0F
+  Page 1: first=10, last=1F
+  Page 2: first=20, last=2F
+  Page 3: first=30, last=3F
+  Page 4: first=40, last=4F
+  Page 5: first=50, last=5F
+</pre>
+</span>
+</div>
+</div>
+<div id="footer">
+<p>
+<div>
+<label class="hidden" id="label-for-line-wrapping-toggle" for="line-wrapping-toggle">Wrap lines
+<input id="line-wrapping-toggle" type="checkbox" autocomplete="off"/>
+</label>
+</div>Generated by 
+<a href="https://www.gradle.org">Gradle 8.14.3</a> at 2026. 1. 7. 오후 3:13:17</p>
+</div>
+</div>
+</body>
+</html>
