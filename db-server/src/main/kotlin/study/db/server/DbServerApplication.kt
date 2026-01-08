@@ -5,7 +5,8 @@ import java.util.Properties
 
 fun main(args: Array<String>) {
     val port = loadPort()
-    val server = DbTcpServer(port)
+    val dbServer = DbServer()
+    val server = DbTcpServer(port, dbServer)
 
     Runtime.getRuntime().addShutdownHook(Thread {
         server.stop()

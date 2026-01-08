@@ -5,10 +5,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="deedb7aa-762a-45da-a9f9-c54ec1c0e049" name="변경" comment="">
-      <change afterPath="$PROJECT_DIR$/db-server/src/main/kotlin/study/db/server/engine/ConnectionHandler.kt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/db-server/src/main/kotlin/study/db/server/engine/ConnectionState.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/db-server/src/main/kotlin/study/db/server/DbServer.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/db-server/src/main/kotlin/study/db/server/DbServerApplication.kt" beforeDir="false" afterPath="$PROJECT_DIR$/db-server/src/main/kotlin/study/db/server/DbServerApplication.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/db-server/src/main/kotlin/study/db/server/engine/ConnectionHandler.kt" beforeDir="false" afterPath="$PROJECT_DIR$/db-server/src/main/kotlin/study/db/server/engine/ConnectionHandler.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/db-server/src/main/kotlin/study/db/server/tcp/DbTcpServer.kt" beforeDir="false" afterPath="$PROJECT_DIR$/db-server/src/main/kotlin/study/db/server/tcp/DbTcpServer.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/db-server/src/main/resources/application.properties" beforeDir="false" afterPath="$PROJECT_DIR$/db-server/src/main/resources/application.properties" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -34,9 +36,9 @@
     <option name="RECENT_TEMPLATES">
       <list>
         <option value="Kotlin Data Class" />
+        <option value="Kotlin Enum" />
         <option value="Class" />
         <option value="Kotlin Class" />
-        <option value="Kotlin Enum" />
       </list>
     </option>
   </component>
@@ -188,6 +190,19 @@
     <configuration name="DbServerApplicationKt" type="JetRunConfigurationType" temporary="true" nameIsGenerated="true">
       <option name="MAIN_CLASS_NAME" value="study.db.server.DbServerApplicationKt" />
       <module name="db.db-server.main" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="JetRunConfigurationType">
+      <module name="db.common" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="KotlinStandaloneScriptRunConfigurationType">
+      <module name="db.common" />
+      <option name="filePath" />
       <method v="2">
         <option name="Make" enabled="true" />
       </method>
