@@ -30,6 +30,7 @@ class DbTcpServer(
 
         while (running) {
             try {
+                // 여기서 TCP handshake 포함
                 val clientSocket = serverSocket?.accept() ?: break
                 executor.submit { handleClient(clientSocket) }
             } catch (e: Exception) {
