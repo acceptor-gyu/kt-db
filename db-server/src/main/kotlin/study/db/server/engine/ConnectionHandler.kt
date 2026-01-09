@@ -13,15 +13,46 @@ import java.io.DataOutputStream
 import java.io.IOException
 import java.net.Socket
 import java.util.*
-import java.util.concurrent.ExecutorService
 
+/**
+ * ConnectionHandler - 개별 클라이언트 연결을 처리하는 핸들러
+ *
+ * MySQL Connection Handler의 역할:
+ * 1. 핸드셰이크 → 인증 → 명령 처리의 상태 기반 흐름 관리
+ * 2. 각 연결에 고유 ID 부여 (디버깅, 모니터링, KILL 명령에 필요)
+ * 3. 연결 리소스의 안전한 정리 (Graceful Shutdown)
+ *
+ * @param connectionId 이 연결의 고유 식별자
+ *                     - MySQL의 CONNECTION_ID()에 해당
+ *                     - AtomicLong 등으로 생성하여 전달받음
+ *                     - 로그, SHOW PROCESSLIST, KILL 명령에 사용
+ * @param socket 클라이언트 소켓
+ * @param tableService 테이블 서비스 (모든 연결이 공유)
+ *                     - 주의: Thread-safe하게 구현되어야 함
+ *
+ * TODO [Connection ID 구현 가이드]
+ * 1. DbTcpServer 또는 ConnectionManager에서 AtomicLong으로 ID 생성
+ *    ```
+ *    class DbTcpServer {
+ *        private val connectionIdGenerator = AtomicLong(0)
+ *
+ *        fun accept() {
+ *            val connId = connectionIdGenerator.incrementAndGet()
+ *            ConnectionHandler(connId, socket, tableService)
+ *        }
+ *    }
+ *    ```
+ * 2. 모든 로그 메시지에 connectionId 포함
+ * 3. SHOW PROCESSLIST 구현 시 활용
+ * 4. KILL <id> 명령 구현 시 활용
+ */
 class ConnectionHandler(
+    val connectionId: Long,  // TODO: 현재 사용 안 됨 - DbTcpServer에서 생성하여 전달 필요
     private val socket: Socket,
-    private val executor: ExecutorService
-
+    private val tableService: TableService  // TODO: 외부에서 주입받도록 변경 (Thread-safe 공유)
 ) : Runnable {
+
     val properties = Properties()
-    private val tableService: TableService = TableService()
     private val json = Json { encodeDefaults = true }
 
     init {
@@ -42,20 +73,88 @@ class ConnectionHandler(
 
     private var state = ConnectionState.CONNECTED
 
+    /**
+     * 연결 처리 메인 루프
+     *
+     * TODO [Graceful Shutdown 구현 가이드]
+     * 현재 문제점:
+     * - 기존 코드에서 executor.shutdown()을 호출하면 모든 연결이 종료됨
+     * - ExecutorService는 모든 ConnectionHandler가 공유하는 스레드 풀
+     * - 한 연결의 예외가 전체 서버에 영향을 주면 안 됨
+     *
+     * 올바른 리소스 정리 원칙:
+     * 1. 개별 연결의 예외는 해당 연결만 정리 (executor는 건드리지 않음)
+     * 2. finally 블록에서 반드시 리소스 정리
+     * 3. 각 리소스(input, output, socket)를 개별적으로 close
+     * 4. close 실패해도 다음 리소스 정리 계속 진행
+     *
+     * 추가 개선 사항:
+     * - 연결 종료 시 ConnectionManager에서 등록 해제
+     * - 로그에 connectionId 포함하여 추적 용이하게
+     */
     override fun run() {
         try {
             // application level handshake
             sendHandshake()
             state = ConnectionState.HANDSHAKE_SENT
 
-            while (true) {
+            while (!socket.isClosed) {
                 val message = input.readUTF()
                 handleMessage(message)
             }
+        } catch (e: java.io.EOFException) {
+            // 클라이언트가 정상적으로 연결을 종료한 경우
+            // TODO: 로그 추가 - "Connection $connectionId closed by client"
+        } catch (e: java.net.SocketException) {
+            // 소켓 관련 예외 (연결 리셋 등)
+            // TODO: 로그 추가 - "Connection $connectionId socket error: ${e.message}"
         } catch (e: Exception) {
-            executor.shutdown()
-            socket.close()
+            // 기타 예외
+            // TODO: 로그 추가 - "Connection $connectionId unexpected error: ${e.message}"
+            e.printStackTrace()
+        } finally {
+            // ⚠️ 중요: executor.shutdown()을 여기서 호출하면 안 됨!
+            // executor는 서버 전체에서 공유하는 스레드 풀이므로
+            // 개별 연결 종료 시에는 해당 연결의 리소스만 정리해야 함
+            close()
         }
+    }
+
+    /**
+     * 연결 리소스 정리
+     *
+     * TODO [리소스 정리 구현 가이드]
+     * 1. ConnectionManager가 있다면 등록 해제
+     *    ```
+     *    connectionManager.unregister(connectionId)
+     *    ```
+     * 2. 각 리소스를 개별 try-catch로 감싸서 하나가 실패해도 나머지 정리 계속
+     * 3. 정리 완료 로그 남기기
+     */
+    private fun close() {
+        // TODO: connectionManager.unregister(connectionId)
+
+        try {
+            input.close()
+        } catch (e: IOException) {
+            // 로그: "Failed to close input stream for connection $connectionId"
+        }
+
+        try {
+            output.close()
+        } catch (e: IOException) {
+            // 로그: "Failed to close output stream for connection $connectionId"
+        }
+
+        try {
+            if (!socket.isClosed) {
+                socket.close()
+            }
+        } catch (e: IOException) {
+            // 로그: "Failed to close socket for connection $connectionId"
+        }
+
+        // TODO: 로그 추가 - "Connection $connectionId closed successfully"
     }
 
     /**
