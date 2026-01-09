@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="핸드셰이크 테스트" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-01-09T07:56:41.141Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.213">
+  <properties/>
+  <testcase name="핸드셰이크 후 인증 대기 상태로 전환" classname="study.db.server.engine.ConnectionHandlerTest$HandshakeTest" time="0.106"/>
+  <testcase name="핸드셰이크 메시지 전송 확인" classname="study.db.server.engine.ConnectionHandlerTest$HandshakeTest" time="0.106"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

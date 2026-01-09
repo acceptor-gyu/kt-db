@@ -1,6 +1,8 @@
 package study.db.server.engine
 
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
+import study.db.common.Table
 import study.db.common.protocol.DbCommand
 import study.db.common.protocol.DbRequest
 import study.db.common.protocol.DbResponse
@@ -56,12 +58,33 @@ class ConnectionHandler(
         }
     }
 
+    /**
+     * 클라이언트에게 초기 핸드셰이크 메시지 전송
+     * TODO: 실제 프로토콜에 맞는 핸드셰이크 메시지 구현 필요
+     */
+    private fun sendHandshake() {
+        output.writeUTF("HANDSHAKE|v1.0")
+        output.flush()
+    }
+
     private fun handleMessage(message: String) {
         when (state) {
             ConnectionState.HANDSHAKE_SENT -> handleAuth(message)
             ConnectionState.AUTHENTICATED -> handleCommand(message)
             else -> protocolError()
         }
+    }
+
+    /**
+     * 인증 완료 후 클라이언트 명령 처리
+     * TODO: 실제 명령 파싱 및 처리 로직 구현 필요
+     * 현재는 ProtocolCodec 기반의 handleClient/processRequest 메서드가 별도로 구현되어 있음
+     */
+    private fun handleCommand(message: String) {
+        // 추후 실제 명령어 처리 로직 구현
+        // 예: CREATE TABLE, INSERT, SELECT 등의 SQL 명령어 파싱 및 실행
+        output.writeUTF("Command received: $message")
+        output.flush()
     }
 
     /**
@@ -95,7 +118,7 @@ class ConnectionHandler(
     }
 
     /**
-     * 추후 Parser쪽으로 역할 분리
+     * TODO: Parser쪽으로 역할 분리
      */
 
     private fun handleClient(socket: Socket) {
@@ -163,13 +186,18 @@ class ConnectionHandler(
         }
     }
 
+    /**
+     * SELECT 명령 처리 - 테이블 조회
+     * Json 직렬화를 통해 Table 객체를 문자열로 변환하여 반환
+     */
     private fun handleSelect(request: DbRequest): DbResponse {
         val tableName = request.tableName
             ?: return DbResponse(success = false, message = "Table name is required", errorCode = 400)
 
         val table = tableService.select(tableName)
         return if (table != null) {
-            DbResponse(success = true, data = json.encodeToString(table))
+            // Table 객체를 JSON 문자열로 직렬화
+            DbResponse(success = true, data = json.encodeToString<Table>(table))
         } else {
             DbResponse(success = false, message = "Table '$tableName' not found", errorCode = 404)
         }

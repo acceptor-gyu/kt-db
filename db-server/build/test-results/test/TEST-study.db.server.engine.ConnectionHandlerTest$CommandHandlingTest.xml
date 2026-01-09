@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="명령 처리 테스트" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-01-09T07:56:40.389Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.221">
+  <properties/>
+  <testcase name="여러 명령을 순차적으로 처리" classname="study.db.server.engine.ConnectionHandlerTest$CommandHandlingTest" time="0.113"/>
+  <testcase name="인증 후 명령 수신 가능" classname="study.db.server.engine.ConnectionHandlerTest$CommandHandlingTest" time="0.107"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

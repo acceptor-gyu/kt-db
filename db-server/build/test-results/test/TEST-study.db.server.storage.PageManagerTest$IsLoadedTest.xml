@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="isLoaded() 테스트" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-01-09T07:56:41.732Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.004">
+  <properties/>
+  <testcase name="readAll() 전에는 false" classname="study.db.server.storage.PageManagerTest$IsLoadedTest" time="0.002"/>
+  <testcase name="빈 파일 로드 후에는 false" classname="study.db.server.storage.PageManagerTest$IsLoadedTest" time="0.001"/>
+  <testcase name="readAll() 후에는 true" classname="study.db.server.storage.PageManagerTest$IsLoadedTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

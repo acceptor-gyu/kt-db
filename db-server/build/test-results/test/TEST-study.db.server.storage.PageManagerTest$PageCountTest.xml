@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="pageCount() 테스트" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-01-09T07:56:41.737Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.004">
+  <properties/>
+  <testcase name="readAll() 후 올바른 페이지 수 반환" classname="study.db.server.storage.PageManagerTest$PageCountTest" time="0.001"/>
+  <testcase name="readAll() 전에는 0" classname="study.db.server.storage.PageManagerTest$PageCountTest" time="0.001"/>
+  <testcase name="파일 크기에 따른 페이지 수 계산" classname="study.db.server.storage.PageManagerTest$PageCountTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="통합 시나리오 테스트" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-01-09T07:56:41.700Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.001">
+  <properties/>
+  <testcase name="전체 CRUD 작업 시나리오" classname="study.db.server.service.TableServiceTest$IntegrationTest" time="0.0"/>
+  <testcase name="여러 테이블 동시 관리" classname="study.db.server.service.TableServiceTest$IntegrationTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

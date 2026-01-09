@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="테이블 삭제 테스트" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-01-09T07:56:41.691Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.002">
+  <properties/>
+  <testcase name="존재하는 테이블 삭제" classname="study.db.server.service.TableServiceTest$DropTableTest" time="0.0"/>
+  <testcase name="데이터가 있는 테이블도 삭제 가능" classname="study.db.server.service.TableServiceTest$DropTableTest" time="0.0"/>
+  <testcase name="테이블 삭제 후 재생성 가능" classname="study.db.server.service.TableServiceTest$DropTableTest" time="0.0"/>
+  <testcase name="존재하지 않는 테이블 삭제 실패" classname="study.db.server.service.TableServiceTest$DropTableTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

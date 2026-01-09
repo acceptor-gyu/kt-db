@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="왕복(Round-trip) 테스트" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-01-09T07:56:41.710Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.002">
+  <properties/>
+  <testcase name="encode 후 decode하면 원본 값 복원" classname="study.db.server.storage.IntFieldEncoderTest$RoundTripTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
