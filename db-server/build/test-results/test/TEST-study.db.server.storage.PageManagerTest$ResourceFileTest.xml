@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="리소스 파일 기반 테스트" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-01-09T07:56:41.756Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.005">
+<testsuite name="리소스 파일 기반 테스트" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-01-09T12:51:17.877Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.005">
   <properties/>
   <testcase name="empty.dat 빈 파일 읽기" classname="study.db.server.storage.PageManagerTest$ResourceFileTest" time="0.001"/>
   <testcase name="partial_page.dat 파일 읽기 (1.5페이지 -&gt; 2페이지)" classname="study.db.server.storage.PageManagerTest$ResourceFileTest" time="0.001"/>

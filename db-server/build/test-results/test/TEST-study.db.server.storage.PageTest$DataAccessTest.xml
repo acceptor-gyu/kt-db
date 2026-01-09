@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="데이터 접근 테스트" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-01-09T07:56:41.763Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.001">
+<testsuite name="데이터 접근 테스트" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-01-09T12:51:17.884Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.0">
   <properties/>
   <testcase name="data 필드 접근" classname="study.db.server.storage.PageTest$DataAccessTest" time="0.0"/>
   <testcase name="id 필드 접근" classname="study.db.server.storage.PageTest$DataAccessTest" time="0.0"/>

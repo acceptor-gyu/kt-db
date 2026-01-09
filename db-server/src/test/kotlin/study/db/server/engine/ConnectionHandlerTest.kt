@@ -5,14 +5,14 @@ import org.junit.jupiter.api.Assertions.*
 import study.db.common.protocol.DbCommand
 import study.db.common.protocol.DbRequest
 import study.db.common.protocol.ProtocolCodec
-import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
+import study.db.server.service.TableService
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * ConnectionHandler 테스트
@@ -28,11 +28,29 @@ class ConnectionHandlerTest {
     private lateinit var serverSideSocket: Socket
     private val executor = Executors.newFixedThreadPool(2)
 
+    // 테스트용 Connection ID 생성기와 공유 TableService
+    private val connectionIdGenerator = AtomicLong(0)
+    private lateinit var sharedTableService: TableService
+
+    /**
+     * 테스트용 ConnectionHandler 생성 헬퍼
+     */
+    private fun createHandler(socket: Socket): ConnectionHandler {
+        return ConnectionHandler(
+            connectionId = connectionIdGenerator.incrementAndGet(),
+            socket = socket,
+            tableService = sharedTableService
+        )
+    }
+
     /**
      * 각 테스트 전에 서버와 클라이언트 소켓을 생성합니다.
      */
     @BeforeEach
     fun setup() {
+        // 테스트용 TableService 초기화
+        sharedTableService = TableService()
+
         // 테스트용 서버 소켓 생성 (포트 0 = 자동 할당)
         serverSocket = ServerSocket(0)
 
@@ -82,7 +100,7 @@ class ConnectionHandlerTest {
         @DisplayName("핸드셰이크 메시지 전송 확인")
         fun `sends handshake message on connection`() {
             // Given: ConnectionHandler 생성
-            val handler = ConnectionHandler(serverSideSocket, Executors.newSingleThreadExecutor())
+            val handler = createHandler(serverSideSocket)
 
             // When: 별도 스레드에서 핸들러 실행
             executor.submit(handler)
@@ -99,7 +117,7 @@ class ConnectionHandlerTest {
         @DisplayName("핸드셰이크 후 인증 대기 상태로 전환")
         fun `transitions to handshake sent state after handshake`() {
             // Given: ConnectionHandler 생성 및 실행
-            val handler = ConnectionHandler(serverSideSocket, Executors.newSingleThreadExecutor())
+            val handler = createHandler(serverSideSocket)
             executor.submit(handler)
 
             // When: 핸드셰이크 메시지 수신
@@ -120,7 +138,7 @@ class ConnectionHandlerTest {
         @DisplayName("올바른 인증 정보로 인증 성공")
         fun `authenticates with valid credentials`() {
             // Given: ConnectionHandler 생성 및 실행
-            val handler = ConnectionHandler(serverSideSocket, Executors.newSingleThreadExecutor())
+            val handler = createHandler(serverSideSocket)
             executor.submit(handler)
 
             val input = DataInputStream(clientSocket.getInputStream())
@@ -141,7 +159,7 @@ class ConnectionHandlerTest {
         @DisplayName("잘못된 인증 정보로 인증 실패")
         fun `fails authentication with invalid credentials`() {
             // Given: ConnectionHandler 생성 및 실행
-            val handler = ConnectionHandler(serverSideSocket, Executors.newSingleThreadExecutor())
+            val handler = createHandler(serverSideSocket)
             executor.submit(handler)
 
             val input = DataInputStream(clientSocket.getInputStream())
@@ -161,7 +179,7 @@ class ConnectionHandlerTest {
         @DisplayName("AUTH 형식이 아닌 메시지로 프로토콜 에러")
         fun `fails with non-auth message during auth phase`() {
             // Given: ConnectionHandler 생성 및 실행
-            val handler = ConnectionHandler(serverSideSocket, Executors.newSingleThreadExecutor())
+            val handler = createHandler(serverSideSocket)
             executor.submit(handler)
 
             val input = DataInputStream(clientSocket.getInputStream())
@@ -205,7 +223,7 @@ class ConnectionHandlerTest {
         @DisplayName("인증 후 명령 수신 가능")
         fun `can receive commands after authentication`() {
             // Given: 인증된 ConnectionHandler
-            val handler = ConnectionHandler(serverSideSocket, Executors.newSingleThreadExecutor())
+            val handler = createHandler(serverSideSocket)
             executor.submit(handler)
 
             val (input, output) = getAuthenticatedClient()
@@ -223,7 +241,7 @@ class ConnectionHandlerTest {
         @DisplayName("여러 명령을 순차적으로 처리")
         fun `can handle multiple commands sequentially`() {
             // Given: 인증된 ConnectionHandler
-            val handler = ConnectionHandler(serverSideSocket, Executors.newSingleThreadExecutor())
+            val handler = createHandler(serverSideSocket)
             executor.submit(handler)
 
             val (input, output) = getAuthenticatedClient()
@@ -321,7 +339,7 @@ class ConnectionHandlerTest {
         @DisplayName("소켓 종료 시 예외 처리")
         fun `handles socket closure gracefully`() {
             // Given: ConnectionHandler 생성
-            val handler = ConnectionHandler(serverSideSocket, Executors.newSingleThreadExecutor())
+            val handler = createHandler(serverSideSocket)
 
             // When: 핸들러 실행 후 클라이언트 소켓 즉시 종료
             executor.submit(handler)
@@ -337,7 +355,7 @@ class ConnectionHandlerTest {
         @DisplayName("연결 끊김 시 리소스 정리")
         fun `cleans up resources on disconnection`() {
             // Given: ConnectionHandler 생성 및 실행
-            val handler = ConnectionHandler(serverSideSocket, Executors.newSingleThreadExecutor())
+            val handler = createHandler(serverSideSocket)
             executor.submit(handler)
 
             // When: 연결 끊김

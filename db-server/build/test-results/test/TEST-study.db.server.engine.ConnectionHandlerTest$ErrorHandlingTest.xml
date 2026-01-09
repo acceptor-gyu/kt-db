@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="에러 처리 테스트" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-01-09T07:56:40.611Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.526">
+<testsuite name="에러 처리 테스트" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-01-09T12:51:16.728Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.52">
   <properties/>
   <testcase name="소켓 종료 시 예외 처리" classname="study.db.server.engine.ConnectionHandlerTest$ErrorHandlingTest" time="0.259"/>
-  <testcase name="연결 끊김 시 리소스 정리" classname="study.db.server.engine.ConnectionHandlerTest$ErrorHandlingTest" time="0.266"/>
+  <testcase name="연결 끊김 시 리소스 정리" classname="study.db.server.engine.ConnectionHandlerTest$ErrorHandlingTest" time="0.261"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

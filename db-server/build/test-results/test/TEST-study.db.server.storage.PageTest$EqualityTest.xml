@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="동등성 테스트" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-01-09T07:56:41.765Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.001">
+<testsuite name="동등성 테스트" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-01-09T12:51:17.885Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.001">
   <properties/>
   <testcase name="copy로 id만 변경" classname="study.db.server.storage.PageTest$EqualityTest" time="0.0"/>
-  <testcase name="다른 id를 가진 Page는 동등하지 않음" classname="study.db.server.storage.PageTest$EqualityTest" time="0.0"/>
-  <testcase name="copy로 생성한 Page" classname="study.db.server.storage.PageTest$EqualityTest" time="0.001"/>
+  <testcase name="다른 id를 가진 Page는 동등하지 않음" classname="study.db.server.storage.PageTest$EqualityTest" time="0.001"/>
+  <testcase name="copy로 생성한 Page" classname="study.db.server.storage.PageTest$EqualityTest" time="0.0"/>
   <testcase name="같은 id와 data를 가진 Page는 동등" classname="study.db.server.storage.PageTest$EqualityTest" time="0.0"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
