@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="toString 테스트" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-01-12T10:33:30.302Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.002">
-  <properties/>
-  <testcase name="toString 포함 id" classname="study.db.server.storage.PageTest$ToStringTest" time="0.002"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>
