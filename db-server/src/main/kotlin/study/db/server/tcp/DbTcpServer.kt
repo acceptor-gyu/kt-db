@@ -15,7 +15,7 @@ import java.net.ServerSocket
  * - MySQL에서는 서버 재시작 시 1부터 다시 시작함
  *
  * [TableService 공유]
- * - TableService는 모든 연결에서 공유 (in-memory DB이므로)
+ * - TableService는 모든 연결에서 공유 (일단 in-memory DB로 구현)
  * - Thread-safe하게 구현 필요 (ConcurrentHashMap 등 사용)
  *
  * [ConnectionManager 기능]
