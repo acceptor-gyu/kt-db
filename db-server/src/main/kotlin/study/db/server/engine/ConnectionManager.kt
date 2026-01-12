@@ -1,5 +1,6 @@
 package study.db.server.engine
 
+import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -28,6 +29,10 @@ import java.util.concurrent.ConcurrentHashMap
  * ```
  */
 class ConnectionManager {
+
+    companion object {
+        private val logger = LoggerFactory.getLogger(ConnectionManager::class.java)
+    }
 
     /**
      * 활성 연결 저장소
@@ -67,9 +72,8 @@ class ConnectionManager {
      * @param handler 등록할 ConnectionHandler
      */
     fun register(handler: ConnectionHandler) {
-        // TODO: 구현
-        // connections[handler.connectionId] = handler
-        // totalConnections.incrementAndGet()
+        connections[handler.connectionId] = handler
+        logger.info("Connection ${handler.connectionId} registered (active: ${getActiveCount()})")
     }
 
     /**
@@ -84,8 +88,8 @@ class ConnectionManager {
      * @param connectionId 해제할 연결 ID
      */
     fun unregister(connectionId: Long) {
-        // TODO: 구현
-        // connections.remove(connectionId)
+        connections.remove(connectionId)
+        logger.info("Connection $connectionId unregistered (active: ${getActiveCount()})")
     }
 
     /**
@@ -99,9 +103,7 @@ class ConnectionManager {
      * @return ConnectionHandler 또는 null
      */
     fun get(connectionId: Long): ConnectionHandler? {
-        // TODO: 구현
-        // return connections[connectionId]
-        return null
+        return connections[connectionId]
     }
 
     /**
@@ -114,9 +116,7 @@ class ConnectionManager {
      * @return 현재 활성 연결 수
      */
     fun getActiveCount(): Int {
-        // TODO: 구현
-        // return connections.size
-        return 0
+        return connections.size
     }
 
     /**

@@ -50,7 +50,8 @@ import java.util.*
 class ConnectionHandler(
     val connectionId: Long,  // TODO: 현재 사용 안 됨 - DbTcpServer에서 생성하여 전달 필요
     private val socket: Socket,
-    private val tableService: TableService  // TODO: 외부에서 주입받도록 변경 (Thread-safe 공유)
+    private val tableService: TableService,  // TODO: 외부에서 주입받도록 변경 (Thread-safe 공유)
+    private val connectionManager: ConnectionManager? = null  // 연결 관리자 (optional)
 ) : Runnable {
 
     companion object {
@@ -136,7 +137,8 @@ class ConnectionHandler(
      * 3. 정리 완료 로그 남기기
      */
     private fun close() {
-        // TODO: connectionManager.unregister(connectionId)
+        // ConnectionManager에서 등록 해제
+        connectionManager?.unregister(connectionId)
 
         try {
             input.close()
@@ -166,6 +168,7 @@ class ConnectionHandler(
      * TODO: 실제 프로토콜에 맞는 핸드셰이크 메시지 구현 필요
      */
     private fun sendHandshake() {
+        logger.info("Connection $connectionId sending handshake")
         output.writeUTF("HANDSHAKE|v1.0")
         output.flush()
     }
@@ -224,6 +227,7 @@ class ConnectionHandler(
     }
 
     private fun protocolError() {
+        logger.warn("Connection $connectionId protocol error, closing connection")
         output.writeUTF("ER_NOT_SUPPORTED_AUTH_MODE")
         output.flush()
         socket.close()
