@@ -2,11 +2,13 @@ package study.db.server.engine
 
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * ConnectionManager - 활성 연결을 추적하고 관리하는 매니저
  *
- * MySQL에서의 역할:
+ * 주요 기능:
+ * - Connection ID 생성 및 관리 (AtomicLong 기반 Thread-safe)
  * - SHOW PROCESSLIST: 현재 연결된 모든 클라이언트 목록 조회
  * - KILL <id>: 특정 연결 강제 종료
  * - 서버 종료 시 모든 연결 graceful shutdown
@@ -18,10 +20,11 @@ import java.util.concurrent.ConcurrentHashMap
  * val connectionManager = ConnectionManager()
  *
  * // 새 연결 시
- * val handler = ConnectionHandler(connId, socket, tableService)
+ * val connectionId = connectionManager.generateConnectionId()
+ * val handler = ConnectionHandler(connectionId, socket, tableService, connectionManager)
  * connectionManager.register(handler)
  *
- * // ConnectionHandler 종료 시
+ * // ConnectionHandler 종료 시 (자동 호출됨)
  * connectionManager.unregister(connectionId)
  *
  * // 서버 종료 시
@@ -35,17 +38,19 @@ class ConnectionManager {
     }
 
     /**
+     * Connection ID 생성기
+     * - incrementAndGet()으로 Thread-safe하게 고유 ID 생성
+     * - 첫 번째 연결은 ID 1번
+     * - MySQL에서는 서버 재시작 시 1부터 다시 시작함
+     */
+    private val connectionIdGenerator = AtomicLong(0)
+
+    /**
      * 활성 연결 저장소
-     *
-     * TODO [구현 가이드]
      * - Key: connectionId (Long)
-     * - Value: ConnectionHandler 또는 ConnectionInfo
+     * - Value: ConnectionHandler
      * - ConcurrentHashMap 사용으로 Thread-safe 보장
-     *
-     * 고려사항:
-     * - ConnectionHandler 직접 저장 vs ConnectionInfo(메타데이터만) 저장
-     * - ConnectionHandler 저장 시: kill() 호출 가능, 메모리 사용 증가
-     * - ConnectionInfo 저장 시: 가벼움, kill 시 별도 메커니즘 필요
+     * - ConnectionHandler 직접 저장으로 kill() 등의 제어 가능
      */
     private val connections = ConcurrentHashMap<Long, ConnectionHandler>()
 
@@ -60,14 +65,16 @@ class ConnectionManager {
     // private val totalConnections = AtomicLong(0)
 
     /**
+     * 새 연결을 위한 고유 ID 생성
+     *
+     * @return 생성된 연결 ID
+     */
+    fun generateConnectionId(): Long {
+        return connectionIdGenerator.incrementAndGet()
+    }
+
+    /**
      * 새 연결 등록
-     *
-     * TODO [구현 가이드]
-     * 1. connections Map에 추가
-     * 2. totalConnections 증가
-     * 3. 로그 출력: "Connection $connectionId registered (active: ${getActiveCount()})"
-     *
-     * 호출 시점: DbTcpServer에서 ConnectionHandler 생성 직후
      *
      * @param handler 등록할 ConnectionHandler
      */
@@ -79,12 +86,6 @@ class ConnectionManager {
     /**
      * 연결 등록 해제
      *
-     * TODO [구현 가이드]
-     * 1. connections Map에서 제거
-     * 2. 로그 출력: "Connection $connectionId unregistered (active: ${getActiveCount()})"
-     *
-     * 호출 시점: ConnectionHandler.close()에서 리소스 정리 시
-     *
      * @param connectionId 해제할 연결 ID
      */
     fun unregister(connectionId: Long) {
@@ -94,10 +95,6 @@ class ConnectionManager {
 
     /**
      * 특정 연결 조회
-     *
-     * TODO [구현 가이드]
-     * - connections Map에서 조회
-     * - 없으면 null 반환
      *
      * @param connectionId 조회할 연결 ID
      * @return ConnectionHandler 또는 null
@@ -109,11 +106,7 @@ class ConnectionManager {
     /**
      * 활성 연결 수 조회
      *
-     * TODO [구현 가이드]
-     * - connections.size 반환
-     * - SHOW STATUS의 'Threads_connected' 값으로 사용
-     *
-     * @return 현재 활성 연결 수
+     * @return 현재 활성 연결 수 (SHOW STATUS의 'Threads_connected' 값)
      */
     fun getActiveCount(): Int {
         return connections.size
@@ -122,7 +115,6 @@ class ConnectionManager {
     /**
      * 모든 활성 연결 목록 조회 (SHOW PROCESSLIST)
      *
-     * TODO [구현 가이드]
      * 반환할 정보:
      * - Id: connectionId
      * - User: 인증된 사용자명 (ConnectionHandler에 추가 필요)

@@ -25,32 +25,25 @@ import java.util.*
  *
  * @param connectionId 이 연결의 고유 식별자
  *                     - MySQL의 CONNECTION_ID()에 해당
- *                     - AtomicLong 등으로 생성하여 전달받음
+ *                     - ConnectionManager에서 생성하여 전달받음
  *                     - 로그, SHOW PROCESSLIST, KILL 명령에 사용
  * @param socket 클라이언트 소켓
  * @param tableService 테이블 서비스 (모든 연결이 공유)
  *                     - 주의: Thread-safe하게 구현되어야 함
+ * @param connectionManager 연결 관리자 (optional)
+ *                          - 연결 등록/해제 처리
+ *                          - 종료 시 자동으로 unregister 호출
  *
- * TODO [Connection ID 구현 가이드]
- * 1. DbTcpServer 또는 ConnectionManager에서 AtomicLong으로 ID 생성
- *    ```
- *    class DbTcpServer {
- *        private val connectionIdGenerator = AtomicLong(0)
- *
- *        fun accept() {
- *            val connId = connectionIdGenerator.incrementAndGet()
- *            ConnectionHandler(connId, socket, tableService)
- *        }
- *    }
- *    ```
- * 2. 모든 로그 메시지에 connectionId 포함
- * 3. SHOW PROCESSLIST 구현 시 활용
- * 4. KILL <id> 명령 구현 시 활용
+ * [Connection ID 관리]
+ * - ConnectionManager.generateConnectionId()로 ID 생성
+ * - 모든 로그 메시지에 connectionId 포함
+ * - SHOW PROCESSLIST 구현 시 활용
+ * - KILL <id> 명령 구현 시 활용
  */
 class ConnectionHandler(
-    val connectionId: Long,  // TODO: 현재 사용 안 됨 - DbTcpServer에서 생성하여 전달 필요
+    val connectionId: Long,  // ConnectionManager에서 생성된 고유 ID
     private val socket: Socket,
-    private val tableService: TableService,  // TODO: 외부에서 주입받도록 변경 (Thread-safe 공유)
+    private val tableService: TableService,  // 모든 연결이 공유하는 TableService (Thread-safe 구현 필요)
     private val connectionManager: ConnectionManager? = null  // 연결 관리자 (optional)
 ) : Runnable {
 
@@ -128,11 +121,7 @@ class ConnectionHandler(
     /**
      * 연결 리소스 정리
      *
-     * TODO [리소스 정리 구현 가이드]
-     * 1. ConnectionManager가 있다면 등록 해제
-     *    ```
-     *    connectionManager.unregister(connectionId)
-     *    ```
+     * 1. ConnectionManager에서 등록 해제
      * 2. 각 리소스를 개별 try-catch로 감싸서 하나가 실패해도 나머지 정리 계속
      * 3. 정리 완료 로그 남기기
      */
