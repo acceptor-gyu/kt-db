@@ -196,17 +196,26 @@ class ConnectionHandler(
     private fun handleAuth(message: String) {
         if (!message.startsWith("AUTH|")) {
             protocolError()
+            return
         }
 
         val parts = message.split("|")
-        val user = parts[1]
-        val password = parts[2]
-
-        if (user != authenticatedUser || password != authenticatedPassword) {
+        if (parts.size < 3) {
+            logger.warn("Connection $connectionId invalid auth format: expected 3 parts, got ${parts.size}")
             protocolError()
             return
         }
 
+        val user = parts[1]
+        val password = parts[2]
+
+        if (user != authenticatedUser || password != authenticatedPassword) {
+            logger.warn("Connection $connectionId authentication failed for user: $user")
+            protocolError()
+            return
+        }
+
+        logger.info("Connection $connectionId authenticated successfully as user: $user")
         output.writeUTF("Authenticated")
         output.flush()
 

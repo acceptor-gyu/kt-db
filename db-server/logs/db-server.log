@@ -1,2 +1,0 @@
-2026-01-12 20:54:59.460 [pool-1-thread-1] INFO  s.db.server.engine.ConnectionHandler - Connection 1 closed by client
-2026-01-12 20:54:59.462 [pool-1-thread-1] INFO  s.db.server.engine.ConnectionHandler - Connection 1 closed successfully
