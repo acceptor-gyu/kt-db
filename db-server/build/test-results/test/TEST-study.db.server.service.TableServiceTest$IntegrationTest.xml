@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="통합 시나리오 테스트" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-01-09T12:51:17.826Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.001">
+<testsuite name="통합 시나리오 테스트" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-01-12T10:33:30.233Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.002">
   <properties/>
-  <testcase name="전체 CRUD 작업 시나리오" classname="study.db.server.service.TableServiceTest$IntegrationTest" time="0.0"/>
+  <testcase name="전체 CRUD 작업 시나리오" classname="study.db.server.service.TableServiceTest$IntegrationTest" time="0.001"/>
   <testcase name="여러 테이블 동시 관리" classname="study.db.server.service.TableServiceTest$IntegrationTest" time="0.001"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>

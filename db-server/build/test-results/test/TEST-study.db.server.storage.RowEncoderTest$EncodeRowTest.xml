@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="encodeRow() 테스트" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-01-09T12:51:17.890Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.002">
+<testsuite name="encodeRow() 테스트" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-01-12T10:33:30.308Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.002">
   <properties/>
   <testcase name="음수 포함 인코딩" classname="study.db.server.storage.RowEncoderTest$EncodeRowTest" time="0.0"/>
-  <testcase name="빈 배열 인코딩" classname="study.db.server.storage.RowEncoderTest$EncodeRowTest" time="0.0"/>
+  <testcase name="빈 배열 인코딩" classname="study.db.server.storage.RowEncoderTest$EncodeRowTest" time="0.001"/>
   <testcase name="다중 컬럼 인코딩" classname="study.db.server.storage.RowEncoderTest$EncodeRowTest" time="0.0"/>
   <testcase name="단일 컬럼 인코딩" classname="study.db.server.storage.RowEncoderTest$EncodeRowTest" time="0.0"/>
-  <testcase name="각 컬럼이 올바른 위치에 인코딩됨" classname="study.db.server.storage.RowEncoderTest$EncodeRowTest" time="0.001"/>
+  <testcase name="각 컬럼이 올바른 위치에 인코딩됨" classname="study.db.server.storage.RowEncoderTest$EncodeRowTest" time="0.0"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

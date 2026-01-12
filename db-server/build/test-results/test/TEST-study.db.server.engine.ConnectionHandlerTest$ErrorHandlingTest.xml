@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="에러 처리 테스트" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-01-09T12:51:16.728Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.52">
+<testsuite name="에러 처리 테스트" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-01-12T10:33:29.157Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.526">
   <properties/>
-  <testcase name="소켓 종료 시 예외 처리" classname="study.db.server.engine.ConnectionHandlerTest$ErrorHandlingTest" time="0.259"/>
+  <testcase name="소켓 종료 시 예외 처리" classname="study.db.server.engine.ConnectionHandlerTest$ErrorHandlingTest" time="0.263"/>
   <testcase name="연결 끊김 시 리소스 정리" classname="study.db.server.engine.ConnectionHandlerTest$ErrorHandlingTest" time="0.261"/>
-  <system-out><![CDATA[]]></system-out>
+  <system-out><![CDATA[2026-01-12 19:33:29.315 [pool-6-thread-2] WARN  s.db.server.engine.ConnectionHandler - Connection 1 socket error: Connection reset
+2026-01-12 19:33:29.316 [pool-6-thread-2] INFO  s.db.server.engine.ConnectionHandler - Connection 1 closed successfully
+2026-01-12 19:33:29.578 [pool-7-thread-2] INFO  s.db.server.engine.ConnectionHandler - Connection 1 closed by client
+2026-01-12 19:33:29.579 [pool-7-thread-2] INFO  s.db.server.engine.ConnectionHandler - Connection 1 closed successfully
+]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

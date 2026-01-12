@@ -1,0 +1,27 @@
+2026-01-12 19:33:28.718 [pool-1-thread-2] ERROR s.db.server.engine.ConnectionHandler - Connection 1 unexpected error: Index: 1, Size: 1
+java.lang.IndexOutOfBoundsException: Index: 1, Size: 1
+	at java.base/java.util.Collections$SingletonList.get(Collections.java:4959)
+	at study.db.server.engine.ConnectionHandler.handleAuth(ConnectionHandler.kt:202)
+	at study.db.server.engine.ConnectionHandler.handleMessage(ConnectionHandler.kt:175)
+	at study.db.server.engine.ConnectionHandler.run(ConnectionHandler.kt:108)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:539)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+2026-01-12 19:33:28.721 [pool-1-thread-2] INFO  s.db.server.engine.ConnectionHandler - Connection 1 closed successfully
+2026-01-12 19:33:28.833 [pool-2-thread-2] INFO  s.db.server.engine.ConnectionHandler - Connection 1 closed successfully
+2026-01-12 19:33:28.937 [pool-3-thread-2] WARN  s.db.server.engine.ConnectionHandler - Connection 1 socket error: Socket closed
+2026-01-12 19:33:28.937 [pool-3-thread-2] INFO  s.db.server.engine.ConnectionHandler - Connection 1 closed successfully
+2026-01-12 19:33:29.049 [pool-4-thread-2] WARN  s.db.server.engine.ConnectionHandler - Connection 1 socket error: Socket closed
+2026-01-12 19:33:29.049 [pool-4-thread-2] INFO  s.db.server.engine.ConnectionHandler - Connection 1 closed successfully
+2026-01-12 19:33:29.156 [pool-5-thread-2] WARN  s.db.server.engine.ConnectionHandler - Connection 1 socket error: Socket closed
+2026-01-12 19:33:29.156 [pool-5-thread-2] INFO  s.db.server.engine.ConnectionHandler - Connection 1 closed successfully
+2026-01-12 19:33:29.315 [pool-6-thread-2] WARN  s.db.server.engine.ConnectionHandler - Connection 1 socket error: Connection reset
+2026-01-12 19:33:29.316 [pool-6-thread-2] INFO  s.db.server.engine.ConnectionHandler - Connection 1 closed successfully
+2026-01-12 19:33:29.578 [pool-7-thread-2] INFO  s.db.server.engine.ConnectionHandler - Connection 1 closed by client
+2026-01-12 19:33:29.579 [pool-7-thread-2] INFO  s.db.server.engine.ConnectionHandler - Connection 1 closed successfully
+2026-01-12 19:33:29.787 [pool-8-thread-2] WARN  s.db.server.engine.ConnectionHandler - Connection 1 socket error: Socket closed
+2026-01-12 19:33:29.787 [pool-8-thread-2] INFO  s.db.server.engine.ConnectionHandler - Connection 1 closed successfully
+2026-01-12 19:33:29.894 [pool-9-thread-2] WARN  s.db.server.engine.ConnectionHandler - Connection 1 socket error: Socket closed
+2026-01-12 19:33:29.894 [pool-9-thread-2] INFO  s.db.server.engine.ConnectionHandler - Connection 1 closed successfully

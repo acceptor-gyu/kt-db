@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="데이터 삽입 테스트" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-01-09T12:51:17.824Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.001">
+<testsuite name="데이터 삽입 테스트" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-01-12T10:33:30.231Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.002">
   <properties/>
-  <testcase name="테이블에 데이터 삽입" classname="study.db.server.service.TableServiceTest$InsertTest" time="0.0"/>
+  <testcase name="테이블에 데이터 삽입" classname="study.db.server.service.TableServiceTest$InsertTest" time="0.001"/>
   <testcase name="존재하지 않는 테이블에 삽입 실패" classname="study.db.server.service.TableServiceTest$InsertTest" time="0.0"/>
   <testcase name="여러 번 삽입하면 값이 병합됨" classname="study.db.server.service.TableServiceTest$InsertTest" time="0.0"/>
   <testcase name="빈 값 삽입" classname="study.db.server.service.TableServiceTest$InsertTest" time="0.0"/>

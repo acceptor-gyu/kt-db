@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="readAll() 테스트" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-01-09T12:51:17.865Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.007">
+<testsuite name="readAll() 테스트" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-01-12T10:33:30.281Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.006">
   <properties/>
   <testcase name="빈 파일 읽기" classname="study.db.server.storage.PageManagerTest$ReadAllTest" time="0.001"/>
-  <testcase name="페이지 데이터가 파일 내용과 일치" classname="study.db.server.storage.PageManagerTest$ReadAllTest" time="0.001"/>
+  <testcase name="페이지 데이터가 파일 내용과 일치" classname="study.db.server.storage.PageManagerTest$ReadAllTest" time="0.0"/>
   <testcase name="PAGE_SIZE보다 작은 파일 읽기 (부분 페이지)" classname="study.db.server.storage.PageManagerTest$ReadAllTest" time="0.001"/>
   <testcase name="readAll() 재호출 시 페이지 목록 초기화" classname="study.db.server.storage.PageManagerTest$ReadAllTest" time="0.001"/>
-  <testcase name="파일 전체를 Page 단위로 읽기" classname="study.db.server.storage.PageManagerTest$ReadAllTest" time="0.0"/>
+  <testcase name="파일 전체를 Page 단위로 읽기" classname="study.db.server.storage.PageManagerTest$ReadAllTest" time="0.001"/>
   <testcase name="각 페이지가 PAGE_SIZE 크기를 가짐" classname="study.db.server.storage.PageManagerTest$ReadAllTest" time="0.001"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>

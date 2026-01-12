@@ -70,7 +70,7 @@ goto fail
 :execute
 @rem Setup the command line
 
-set CLASSPATH=%APP_HOME%\lib\db-server-0.0.1-SNAPSHOT.jar;%APP_HOME%\lib\common-0.0.1-SNAPSHOT.jar;%APP_HOME%\lib\kotlin-reflect-1.9.25.jar;%APP_HOME%\lib\kotlinx-serialization-core-jvm-1.6.3.jar;%APP_HOME%\lib\kotlinx-serialization-json-jvm-1.6.3.jar;%APP_HOME%\lib\kotlin-stdlib-1.9.25.jar;%APP_HOME%\lib\annotations-13.0.jar
+set CLASSPATH=%APP_HOME%\lib\db-server-0.0.1-SNAPSHOT.jar;%APP_HOME%\lib\common-0.0.1-SNAPSHOT.jar;%APP_HOME%\lib\kotlin-reflect-1.9.25.jar;%APP_HOME%\lib\kotlinx-serialization-core-jvm-1.6.3.jar;%APP_HOME%\lib\kotlinx-serialization-json-jvm-1.6.3.jar;%APP_HOME%\lib\kotlin-stdlib-1.9.25.jar;%APP_HOME%\lib\logback-classic-1.4.14.jar;%APP_HOME%\lib\slf4j-api-2.0.9.jar;%APP_HOME%\lib\annotations-13.0.jar;%APP_HOME%\lib\logback-core-1.4.14.jar
 
 
 @rem Execute db-server

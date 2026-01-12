@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="프로토콜 처리 테스트" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-01-09T12:51:17.473Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.335">
+<testsuite name="프로토콜 처리 테스트" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-01-12T10:33:29.894Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.328">
   <properties/>
-  <testcase name="INSERT 명령 요청 생성" classname="study.db.server.engine.ConnectionHandlerTest$ProtocolTest" time="0.117"/>
-  <testcase name="ProtocolCodec을 통한 요청 처리 구조 확인" classname="study.db.server.engine.ConnectionHandlerTest$ProtocolTest" time="0.106"/>
-  <testcase name="CREATE_TABLE 명령 요청 생성" classname="study.db.server.engine.ConnectionHandlerTest$ProtocolTest" time="0.108"/>
+  <testcase name="INSERT 명령 요청 생성" classname="study.db.server.engine.ConnectionHandlerTest$ProtocolTest" time="0.121"/>
+  <testcase name="ProtocolCodec을 통한 요청 처리 구조 확인" classname="study.db.server.engine.ConnectionHandlerTest$ProtocolTest" time="0.105"/>
+  <testcase name="CREATE_TABLE 명령 요청 생성" classname="study.db.server.engine.ConnectionHandlerTest$ProtocolTest" time="0.101"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

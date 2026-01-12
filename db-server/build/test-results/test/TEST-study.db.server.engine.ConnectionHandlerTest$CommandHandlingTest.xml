@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="명령 처리 테스트" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-01-09T12:51:16.498Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.226">
+<testsuite name="명령 처리 테스트" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-01-12T10:33:28.938Z" hostname="gimseong-gyuui-MacBookAir.local" time="0.218">
   <properties/>
-  <testcase name="여러 명령을 순차적으로 처리" classname="study.db.server.engine.ConnectionHandlerTest$CommandHandlingTest" time="0.116"/>
-  <testcase name="인증 후 명령 수신 가능" classname="study.db.server.engine.ConnectionHandlerTest$CommandHandlingTest" time="0.109"/>
-  <system-out><![CDATA[]]></system-out>
+  <testcase name="여러 명령을 순차적으로 처리" classname="study.db.server.engine.ConnectionHandlerTest$CommandHandlingTest" time="0.111"/>
+  <testcase name="인증 후 명령 수신 가능" classname="study.db.server.engine.ConnectionHandlerTest$CommandHandlingTest" time="0.107"/>
+  <system-out><![CDATA[2026-01-12 19:33:29.049 [pool-4-thread-2] WARN  s.db.server.engine.ConnectionHandler - Connection 1 socket error: Socket closed
+2026-01-12 19:33:29.049 [pool-4-thread-2] INFO  s.db.server.engine.ConnectionHandler - Connection 1 closed successfully
+2026-01-12 19:33:29.156 [pool-5-thread-2] WARN  s.db.server.engine.ConnectionHandler - Connection 1 socket error: Socket closed
+2026-01-12 19:33:29.156 [pool-5-thread-2] INFO  s.db.server.engine.ConnectionHandler - Connection 1 closed successfully
+]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

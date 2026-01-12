@@ -2,6 +2,7 @@ package study.db.server.engine
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
+import org.slf4j.LoggerFactory
 import study.db.common.Table
 import study.db.common.protocol.DbCommand
 import study.db.common.protocol.DbRequest
@@ -51,6 +52,10 @@ class ConnectionHandler(
     private val socket: Socket,
     private val tableService: TableService  // TODO: 외부에서 주입받도록 변경 (Thread-safe 공유)
 ) : Runnable {
+
+    companion object {
+        private val logger = LoggerFactory.getLogger(ConnectionHandler::class.java)
+    }
 
     val properties = Properties()
     private val json = Json { encodeDefaults = true }
@@ -104,14 +109,13 @@ class ConnectionHandler(
             }
         } catch (e: java.io.EOFException) {
             // 클라이언트가 정상적으로 연결을 종료한 경우
-            // TODO: 로그 추가 - "Connection $connectionId closed by client"
+            logger.info("Connection $connectionId closed by client")
         } catch (e: java.net.SocketException) {
             // 소켓 관련 예외 (연결 리셋 등)
-            // TODO: 로그 추가 - "Connection $connectionId socket error: ${e.message}"
+            logger.warn("Connection $connectionId socket error: ${e.message}")
         } catch (e: Exception) {
             // 기타 예외
-            // TODO: 로그 추가 - "Connection $connectionId unexpected error: ${e.message}"
-            e.printStackTrace()
+            logger.error("Connection $connectionId unexpected error: ${e.message}", e)
         } finally {
             // ⚠️ 중요: executor.shutdown()을 여기서 호출하면 안 됨!
             // executor는 서버 전체에서 공유하는 스레드 풀이므로
@@ -137,13 +141,13 @@ class ConnectionHandler(
         try {
             input.close()
         } catch (e: IOException) {
-            // 로그: "Failed to close input stream for connection $connectionId"
+            logger.warn("Failed to close input stream for connection $connectionId: ${e.message}")
         }
 
         try {
             output.close()
         } catch (e: IOException) {
-            // 로그: "Failed to close output stream for connection $connectionId"
+            logger.warn("Failed to close output stream for connection $connectionId: ${e.message}")
         }
 
         try {
@@ -151,10 +155,10 @@ class ConnectionHandler(
                 socket.close()
             }
         } catch (e: IOException) {
-            // 로그: "Failed to close socket for connection $connectionId"
+            logger.warn("Failed to close socket for connection $connectionId: ${e.message}")
         }
 
-        // TODO: 로그 추가 - "Connection $connectionId closed successfully"
+        logger.info("Connection $connectionId closed successfully")
     }
 
     /**
