@@ -8,10 +8,6 @@ import study.db.server.elasticsearch.document.QueryType
 @Repository
 interface QueryLogRepository : ElasticsearchRepository<QueryLog, String> {
 
-    fun findByQueryType(queryType: QueryType): List<QueryLog>
-
-    fun findByConnectionId(connectionId: String): List<QueryLog>
-
     fun findByAffectedTablesContaining(tableName: String): List<QueryLog>
 
     fun findByQueryTypeAndAffectedTablesContaining(

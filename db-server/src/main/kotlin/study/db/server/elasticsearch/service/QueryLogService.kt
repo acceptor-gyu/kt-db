@@ -9,6 +9,9 @@ import study.db.server.elasticsearch.document.QueryStatus
 import study.db.server.elasticsearch.document.QueryType
 import study.db.server.elasticsearch.repository.QueryLogRepository
 
+/**
+ * TODO: QueryType이 DQL(Data Query Language)인 경우, tableName으로 조회 후, 분석
+ */
 @Service
 class QueryLogService(
     private val queryLogRepository: QueryLogRepository
@@ -26,18 +29,8 @@ class QueryLogService(
         }
     }
 
-    fun getQueryLogById(queryId: String): QueryLog? {
-        return try {
-            queryLogRepository.findById(queryId).orElse(null)
-        } catch (e: Exception) {
-            logger.error("Failed to get query log by id: $queryId", e)
-            null
-        }
-    }
-
     fun searchQueryLogs(
         queryType: QueryType? = null,
-        connectionId: String? = null,
         tableName: String? = null,
         limit: Int = 100
     ): List<QueryLog> {
@@ -45,15 +38,6 @@ class QueryLogService(
             when {
                 queryType != null && tableName != null -> {
                     queryLogRepository.findByQueryTypeAndAffectedTablesContaining(queryType, tableName)
-                }
-                queryType != null -> {
-                    queryLogRepository.findByQueryType(queryType)
-                }
-                connectionId != null -> {
-                    queryLogRepository.findByConnectionId(connectionId)
-                }
-                tableName != null -> {
-                    queryLogRepository.findByAffectedTablesContaining(tableName)
                 }
                 else -> {
                     queryLogRepository.findAll(
@@ -93,11 +77,6 @@ class QueryLogService(
             logger.error("Failed to get query statistics for table: $tableName", e)
             null
         }
-    }
-
-    fun deleteAll() {
-        queryLogRepository.deleteAll()
-        logger.info("Deleted all query logs")
     }
 }
 

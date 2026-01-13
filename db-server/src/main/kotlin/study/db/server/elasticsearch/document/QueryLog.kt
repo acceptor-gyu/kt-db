@@ -50,8 +50,6 @@ enum class QueryType {
     DDL,
     DML,
     DQL,
-    DCL,
-    TCL,
     UNKNOWN
 }
 
