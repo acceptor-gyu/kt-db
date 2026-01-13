@@ -1,0 +1,19 @@
+db:
+  server:
+    port: 9000
+
+default:
+  user: user
+  password: "9000"
+
+spring:
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
+  data:
+    elasticsearch:
+      repositories:
+        enabled: true
+
+elasticsearch:
+  index:
+    query-logs: db-query-logs
