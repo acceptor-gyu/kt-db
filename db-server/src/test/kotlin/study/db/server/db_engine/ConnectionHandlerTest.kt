@@ -1,4 +1,4 @@
-package study.db.server.engine
+package study.db.server.db_engine
 
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*

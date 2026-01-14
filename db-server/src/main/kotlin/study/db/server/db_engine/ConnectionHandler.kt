@@ -1,4 +1,4 @@
-package study.db.server.engine
+package study.db.server.db_engine
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
@@ -14,6 +14,19 @@ import java.io.DataOutputStream
 import java.io.IOException
 import java.net.Socket
 import java.util.*
+
+/**
+ *
+ * DB 엔진 흐름
+ *
+ * Parser      : 문법 검사, AST 생성
+ *  ↓
+ * Resolver    : 이름 해석, 타입 결정, 의미 확정
+ *  ↓
+ * Optimizer   : 실행 방법 선택
+ *  ↓
+ * Executor    : 실제 실행
+ */
 
 /**
  * ConnectionHandler - 개별 클라이언트 연결을 처리하는 핸들러
@@ -184,6 +197,8 @@ class ConnectionHandler(
 
     /**
      * 학습을 위한 프로젝트로 인증/인가 검증은 간단하게 처리
+     *
+     * Privilege System (Parser -> Resolver -> Privilege System)
      */
     private fun handleAuth(message: String) {
         if (!message.startsWith("AUTH|")) {
