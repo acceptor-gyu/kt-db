@@ -30,11 +30,14 @@ dependencies {
     implementation(project(":common"))
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
-    // Spring Boot
+    // Elasticsearch를 편하게 활용하기 위한 Spring Boot 관련 설정
     implementation("org.springframework.boot:spring-boot-starter")
     implementation("org.springframework.boot:spring-boot-starter-data-elasticsearch")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
+
+    // SQL 파서 (SQL을 파싱하고 자바 객체로 변환)
+    implementation("com.github.jsqlparser:jsqlparser:4.7")
 }
