@@ -67,13 +67,23 @@ class ConnectionHandler(
     val properties = Properties()
     private val json = Json { encodeDefaults = true }
 
+    /**
+     * 클래스패스에서 application.properties 파일을 읽어서 인증 정보(user, password)를 로드합니다.
+     *
+     * - 파일을 찾지 못하면 IOException을 던지지만, catch 블록에서 경고 로그만 출력하고 계속 진행
+     * - 이 경우 authenticatedUser, authenticatedPassword가 빈 문자열로 초기화됨
+     * - 프로덕션 환경에서는 파일이 없으면 연결을 거부하거나 기본값을 명시적으로 설정하는 것이 더 안전
+     *
+     * TODO:
+     * - 파일이 없으면 연결을 거부하도록 변경 고려
+     */
     init {
         try {
             val inputStream = this::class.java.classLoader.getResourceAsStream("application.properties")
                 ?: throw IOException("application.properties 파일을 찾을 수 없습니다.")
             properties.load(inputStream)
         } catch (e: IOException) {
-            e.printStackTrace()
+            logger.warn("Failed to load application.properties for connection {}: {}", connectionId, e.message)
         }
     }
 
@@ -163,6 +173,21 @@ class ConnectionHandler(
         }
 
         logger.info("Connection $connectionId closed successfully")
+    }
+
+    /**
+     * 소켓 닫기 (외부에서 호출 가능)
+     * - ConnectionManager.closeAll()에서 사용
+     * - 소켓을 닫으면 run()의 readUTF()에서 예외 발생 → finally에서 정리
+     */
+    fun closeSocket() {
+        try {
+            if (!socket.isClosed) {
+                socket.close()
+            }
+        } catch (e: IOException) {
+            logger.warn("Failed to close socket for connection $connectionId: ${e.message}")
+        }
     }
 
     /**
