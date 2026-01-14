@@ -4,6 +4,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import study.db.api.client.DbClient
 import study.db.api.dto.FindQueryPlanResponse
+import study.db.api.dto.SqlQueryRequest
 import study.db.common.protocol.DbCommand
 import study.db.common.protocol.DbRequest
 
@@ -31,11 +32,11 @@ class TableController(
         return ResponseEntity.ok(dummyResponse)
     }
 
-    // e.g. POST /api/tables/create?query=CREATE TABLE users (id INT, name VARCHAR(100));
+    // e.g. POST /api/tables/create
+    // Body: { "query": "CREATE TABLE users (id INT, name VARCHAR(100));" }
     @PostMapping("/create")
-    fun createTable(@RequestParam(required = true) query: String): ResponseEntity<Map<String, Any>> {
+    fun createTable(@RequestBody request: SqlQueryRequest): ResponseEntity<Map<String, Any>> {
         // TODO: SQL 쿼리 파싱하여 DbRequest로 변환
-        // 임시로 기존 로직 유지
         val dbRequest = DbRequest(
             command = DbCommand.CREATE_TABLE,
             tableName = "", // SQL 파싱 필요
@@ -59,9 +60,10 @@ class TableController(
         }
     }
 
-    // e.g. POST /api/tables/insert?query=INSERT INTO users VALUES (1, 'John');
+    // e.g. POST /api/tables/insert
+    // Body: { "query": "INSERT INTO users VALUES (1, 'John');" }
     @PostMapping("/insert")
-    fun insert(@RequestParam(required = true) query: String): ResponseEntity<Map<String, Any>> {
+    fun insert(@RequestBody request: SqlQueryRequest): ResponseEntity<Map<String, Any>> {
         // TODO: SQL 쿼리 파싱하여 DbRequest로 변환
         val dbRequest = DbRequest(
             command = DbCommand.INSERT,
