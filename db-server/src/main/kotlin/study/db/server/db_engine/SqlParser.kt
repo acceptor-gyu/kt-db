@@ -14,7 +14,7 @@ import net.sf.jsqlparser.schema.Column
 /**
  * Parser      : 문법 검사, AST 생성
  *
- *
+ * <잘못된 문법 예시>
  * 키워드 오타   |	SELEC * FROM
  * 괄호 불일치	  | SELECT (a FROM t
  * 잘못된 문장 구조  |	SELECT FROM table
