@@ -511,7 +511,7 @@ class SqlParserTest {
             val sql = """
                 SELECT timestamp, level, message
                 FROM logs
-                WHERE level = 'ERROR' AND timestamp BETWEEN '2024-01-01' AND '2024-12-31'
+                WHERE level = 'ERROR' AND timestamp BETWEEN '2026-01-01' AND '2026-12-31'
                 ORDER BY timestamp DESC
             """.trimIndent()
 
@@ -526,8 +526,8 @@ class SqlParserTest {
             val betweenCondition = result.whereConditions.find { it.operator == "BETWEEN" }
             assertNotNull(betweenCondition)
             assertEquals("timestamp", betweenCondition?.column)
-            assertTrue(betweenCondition?.value?.contains("2024-01-01") == true)
-            assertTrue(betweenCondition?.value?.contains("2024-12-31") == true)
+            assertTrue(betweenCondition?.value?.contains("2026-01-01") == true)
+            assertTrue(betweenCondition?.value?.contains("2026-12-31") == true)
         }
     }
 }
