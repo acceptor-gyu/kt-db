@@ -1,10 +1,10 @@
-package study.db.server.tcp
+package study.db.server
 
-import study.db.server.DbServer
 import study.db.server.db_engine.ConnectionHandler
 import study.db.server.db_engine.ConnectionManager
 import study.db.server.service.TableService
 import java.net.ServerSocket
+import java.util.concurrent.Executors
 
 /**
  * DbTcpServer - TCP 연결을 수락하고 ConnectionHandler에 위임하는 서버
@@ -26,9 +26,9 @@ import java.net.ServerSocket
  * - 서버 종료 시 모든 연결 graceful shutdown
  */
 class DbTcpServer(
-    private val port: Int,
-    private val dbServer: DbServer = DbServer()
+    private val port: Int
 ) {
+    val executor = Executors.newFixedThreadPool(3)
 
     private var serverSocket: ServerSocket? = null
 
@@ -76,7 +76,7 @@ class DbTcpServer(
                 // ConnectionManager에 연결 등록
                 connectionManager.register(handler)
 
-                dbServer.executor.submit(handler)
+                executor.submit(handler)
 
                 println("New connection accepted: id=$connectionId, remote=${clientSocket.remoteSocketAddress}")
             } catch (e: Exception) {

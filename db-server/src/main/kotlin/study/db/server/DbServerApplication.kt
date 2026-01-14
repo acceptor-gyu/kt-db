@@ -1,18 +1,16 @@
 package study.db.server
 
-import study.db.server.tcp.DbTcpServer
 import java.util.Properties
 
 fun main(args: Array<String>) {
     val port = loadPort()
-    val dbServer = DbServer()
-    val server = DbTcpServer(port, dbServer)
+    val tcpServer = DbTcpServer(port)
 
     Runtime.getRuntime().addShutdownHook(Thread {
-        server.stop()
+        tcpServer.stop()
     })
 
-    server.start()
+    tcpServer.start()
 }
 
 private fun loadPort(): Int {
