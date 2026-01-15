@@ -18,7 +18,7 @@ COPY db-server/ ./db-server/
 COPY api-server/ ./api-server/
 
 # Build the project using gradle wrapper
-RUN ./gradlew :db-server:build -x test --no-daemon
+RUN ./gradlew :db-server:distTar -x test --no-daemon
 
 # Stage 2: Runtime
 FROM eclipse-temurin:17-jre
