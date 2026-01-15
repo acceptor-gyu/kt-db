@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations
 import study.db.server.elasticsearch.document.IndexMetadata
 import study.db.server.elasticsearch.document.QueryLog
+import study.db.server.elasticsearch.document.QueryPlan
 import study.db.server.elasticsearch.document.TableMetadata
 import study.db.server.elasticsearch.document.TableStatistics
 
@@ -37,6 +38,10 @@ class InitElasticsearchIndexApp {
                 // Initialize TableStatistics index
                 logger.info("Initializing TableStatistics index...")
                 initializeIndex(elasticsearchOperations, TableStatistics::class.java, "TableStatistics", forceMode)
+
+                // Initialize QueryPlan index
+                logger.info("Initializing QueryPlan index...")
+                initializeIndex(elasticsearchOperations, QueryPlan::class.java, "QueryPlan", forceMode)
 
                 logger.info("All indices initialized successfully")
 

@@ -11,6 +11,8 @@ import net.sf.jsqlparser.expression.operators.conditional.OrExpression
 import net.sf.jsqlparser.expression.operators.relational.*
 import net.sf.jsqlparser.schema.Column
 
+import org.springframework.stereotype.Component
+
 /**
  * Parser      : 문법 검사, AST 생성
  *
@@ -23,6 +25,7 @@ import net.sf.jsqlparser.schema.Column
  *
  * JsqlParser 활용
  */
+@Component
 class SqlParser {
 
     /**
