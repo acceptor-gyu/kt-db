@@ -4,6 +4,7 @@ import org.slf4j.LoggerFactory
 import study.db.server.db_engine.ConnectionHandler
 import study.db.server.db_engine.ConnectionManager
 import study.db.server.service.TableService
+import study.db.server.elasticsearch.service.ExplainService
 import java.net.ServerSocket
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
@@ -35,7 +36,8 @@ import java.util.concurrent.TimeUnit
  */
 class DbTcpServer(
     private val port: Int,
-    private val maxConnections: Int = 10
+    private val maxConnections: Int = 10,
+    private val explainService: ExplainService? = null  // EXPLAIN 명령 지원 (optional)
 ) {
     companion object {
         private val logger = LoggerFactory.getLogger(DbTcpServer::class.java)
@@ -92,7 +94,8 @@ class DbTcpServer(
                     connectionId = connectionId,
                     socket = clientSocket,
                     tableService = sharedTableService,
-                    connectionManager = connectionManager
+                    connectionManager = connectionManager,
+                    explainService = explainService
                 )
 
                 try {

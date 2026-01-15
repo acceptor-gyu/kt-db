@@ -42,7 +42,9 @@ class ConnectionHandlerTest {
         return ConnectionHandler(
             connectionId = connectionIdGenerator.incrementAndGet(),
             socket = socket,
-            tableService = sharedTableService
+            tableService = sharedTableService,
+            connectionManager = null,
+            explainService = null  // EXPLAIN 기능은 테스트에서 제외
         )
     }
 

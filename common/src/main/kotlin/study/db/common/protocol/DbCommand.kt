@@ -6,5 +6,6 @@ enum class DbCommand {
     SELECT,
     DELETE,
     DROP_TABLE,
-    PING
+    PING,
+    EXPLAIN
 }

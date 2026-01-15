@@ -9,6 +9,8 @@ import study.db.common.protocol.DbRequest
 import study.db.common.protocol.DbResponse
 import study.db.common.protocol.ProtocolCodec
 import study.db.server.service.TableService
+import study.db.server.elasticsearch.service.ExplainService
+import study.db.server.elasticsearch.document.QueryPlan
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.IOException
@@ -57,7 +59,8 @@ class ConnectionHandler(
     val connectionId: Long,  // ConnectionManager에서 생성된 고유 ID
     private val socket: Socket,
     private val tableService: TableService,  // 모든 연결이 공유하는 TableService (Thread-safe 구현 필요)
-    private val connectionManager: ConnectionManager? = null  // 연결 관리자 (optional)
+    private val connectionManager: ConnectionManager? = null,  // 연결 관리자 (optional)
+    private val explainService: ExplainService? = null  // EXPLAIN 명령 처리 서비스
 ) : Runnable {
 
     companion object {
@@ -300,6 +303,7 @@ class ConnectionHandler(
             DbCommand.DELETE -> handleDelete(request)
             DbCommand.DROP_TABLE -> handleDropTable(request)
             DbCommand.PING -> DbResponse(success = true, message = "pong")
+            DbCommand.EXPLAIN -> handleExplain(request)
         }
     }
 
@@ -361,6 +365,67 @@ class ConnectionHandler(
             DbResponse(success = true, message = "Table '$tableName' dropped")
         } else {
             DbResponse(success = false, message = "Table '$tableName' not found", errorCode = 404)
+        }
+    }
+
+    /**
+     * EXPLAIN 명령 처리 - 쿼리 실행 계획 생성
+     *
+     * SQL 쿼리를 분석하여 실행 계획(QueryPlan)을 생성하고 JSON으로 반환합니다.
+     * 실행 계획에는 다음 정보가 포함됩니다:
+     * - INDEX_SCAN vs TABLE_SCAN 결정
+     * - Covered Query 여부
+     * - 예상 비용 및 행 수
+     * - Selectivity 계산
+     */
+    private fun handleExplain(request: DbRequest): DbResponse {
+        // ExplainService가 주입되지 않은 경우
+        if (explainService == null) {
+            return DbResponse(
+                success = false,
+                message = "EXPLAIN command is not available (ExplainService not configured)",
+                errorCode = 503
+            )
+        }
+
+        // SQL 쿼리가 제공되지 않은 경우
+        val sql = request.sql
+            ?: return DbResponse(success = false, message = "SQL query is required for EXPLAIN", errorCode = 400)
+
+        return try {
+            // ExplainService를 통해 쿼리 실행 계획 생성
+            val queryPlan = explainService.explain(sql)
+
+            // QueryPlan 객체를 JSON 문자열로 직렬화
+            val queryPlanJson = json.encodeToString<QueryPlan>(queryPlan)
+
+            DbResponse(
+                success = true,
+                message = "Query plan generated successfully",
+                data = queryPlanJson
+            )
+        } catch (e: IllegalArgumentException) {
+            // SQL 파싱 실패
+            DbResponse(
+                success = false,
+                message = "Failed to parse SQL: ${e.message}",
+                errorCode = 400
+            )
+        } catch (e: IllegalStateException) {
+            // 테이블이 존재하지 않는 경우 등
+            DbResponse(
+                success = false,
+                message = "Failed to generate query plan: ${e.message}",
+                errorCode = 404
+            )
+        } catch (e: Exception) {
+            // 기타 예외
+            logger.error("Failed to execute EXPLAIN for connection $connectionId", e)
+            DbResponse(
+                success = false,
+                message = "Internal error: ${e.message}",
+                errorCode = 500
+            )
         }
     }
 }
