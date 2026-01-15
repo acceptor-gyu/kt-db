@@ -6,6 +6,7 @@ import org.springframework.boot.SpringApplication
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.context.annotation.Bean
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations
+import study.db.server.elasticsearch.document.IndexMetadata
 import study.db.server.elasticsearch.document.QueryLog
 import study.db.server.elasticsearch.document.TableMetadata
 
@@ -27,6 +28,10 @@ class InitElasticsearchIndexApp {
                 // Initialize TableMetadata index
                 logger.info("Initializing TableMetadata index...")
                 initializeIndex(elasticsearchOperations, TableMetadata::class.java, "TableMetadata", forceMode)
+
+                // Initialize IndexMetadata index
+                logger.info("Initializing IndexMetadata index...")
+                initializeIndex(elasticsearchOperations, IndexMetadata::class.java, "IndexMetadata", forceMode)
 
                 logger.info("All indices initialized successfully")
 
