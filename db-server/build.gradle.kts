@@ -26,6 +26,20 @@ tasks.register<JavaExec>("runQueryLogExample") {
     mainClass.set("study.db.server.elasticsearch.example.QueryLogExampleApp")
 }
 
+tasks.register<JavaExec>("runInitSampleData") {
+    group = "explain"
+    description = "Initialize sample data for EXPLAIN testing"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("study.db.server.elasticsearch.example.InitSampleDataForExplainApp")
+}
+
+tasks.register<JavaExec>("runExplainExample") {
+    group = "explain"
+    description = "Run EXPLAIN command examples"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("study.db.server.elasticsearch.example.ExplainExampleApp")
+}
+
 dependencies {
     implementation(project(":common"))
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
