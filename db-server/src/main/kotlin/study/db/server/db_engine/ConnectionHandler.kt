@@ -1,4 +1,4 @@
-package study.db.server.engine
+package study.db.server.db_engine
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
@@ -9,11 +9,26 @@ import study.db.common.protocol.DbRequest
 import study.db.common.protocol.DbResponse
 import study.db.common.protocol.ProtocolCodec
 import study.db.server.service.TableService
+import study.db.server.elasticsearch.service.ExplainService
+import study.db.server.elasticsearch.document.QueryPlan
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.IOException
 import java.net.Socket
 import java.util.*
+
+/**
+ *
+ * DB 엔진 흐름
+ *
+ * Parser      : 문법 검사, AST 생성
+ *  ↓
+ * Resolver    : 이름 해석, 타입 결정, 의미 확정
+ *  ↓
+ * Optimizer   : 실행 방법 선택
+ *  ↓
+ * Executor    : 실제 실행
+ */
 
 /**
  * ConnectionHandler - 개별 클라이언트 연결을 처리하는 핸들러
@@ -44,7 +59,8 @@ class ConnectionHandler(
     val connectionId: Long,  // ConnectionManager에서 생성된 고유 ID
     private val socket: Socket,
     private val tableService: TableService,  // 모든 연결이 공유하는 TableService (Thread-safe 구현 필요)
-    private val connectionManager: ConnectionManager? = null  // 연결 관리자 (optional)
+    private val connectionManager: ConnectionManager? = null,  // 연결 관리자 (optional)
+    private val explainService: ExplainService? = null  // EXPLAIN 명령 처리 서비스
 ) : Runnable {
 
     companion object {
@@ -54,13 +70,23 @@ class ConnectionHandler(
     val properties = Properties()
     private val json = Json { encodeDefaults = true }
 
+    /**
+     * 클래스패스에서 application.properties 파일을 읽어서 인증 정보(user, password)를 로드합니다.
+     *
+     * - 파일을 찾지 못하면 IOException을 던지지만, catch 블록에서 경고 로그만 출력하고 계속 진행
+     * - 이 경우 authenticatedUser, authenticatedPassword가 빈 문자열로 초기화됨
+     * - 프로덕션 환경에서는 파일이 없으면 연결을 거부하거나 기본값을 명시적으로 설정하는 것이 더 안전
+     *
+     * TODO:
+     * - 파일이 없으면 연결을 거부하도록 변경 고려
+     */
     init {
         try {
             val inputStream = this::class.java.classLoader.getResourceAsStream("application.properties")
                 ?: throw IOException("application.properties 파일을 찾을 수 없습니다.")
             properties.load(inputStream)
         } catch (e: IOException) {
-            e.printStackTrace()
+            logger.warn("Failed to load application.properties for connection {}: {}", connectionId, e.message)
         }
     }
 
@@ -153,6 +179,21 @@ class ConnectionHandler(
     }
 
     /**
+     * 소켓 닫기 (외부에서 호출 가능)
+     * - ConnectionManager.closeAll()에서 사용
+     * - 소켓을 닫으면 run()의 readUTF()에서 예외 발생 → finally에서 정리
+     */
+    fun closeSocket() {
+        try {
+            if (!socket.isClosed) {
+                socket.close()
+            }
+        } catch (e: IOException) {
+            logger.warn("Failed to close socket for connection $connectionId: ${e.message}")
+        }
+    }
+
+    /**
      * 클라이언트에게 초기 핸드셰이크 메시지 전송
      * TODO: 실제 프로토콜에 맞는 핸드셰이크 메시지 구현 필요
      */
@@ -184,6 +225,8 @@ class ConnectionHandler(
 
     /**
      * 학습을 위한 프로젝트로 인증/인가 검증은 간단하게 처리
+     *
+     * Privilege System (Parser -> Resolver -> Privilege System)
      */
     private fun handleAuth(message: String) {
         if (!message.startsWith("AUTH|")) {
@@ -260,6 +303,7 @@ class ConnectionHandler(
             DbCommand.DELETE -> handleDelete(request)
             DbCommand.DROP_TABLE -> handleDropTable(request)
             DbCommand.PING -> DbResponse(success = true, message = "pong")
+            DbCommand.EXPLAIN -> handleExplain(request)
         }
     }
 
@@ -321,6 +365,67 @@ class ConnectionHandler(
             DbResponse(success = true, message = "Table '$tableName' dropped")
         } else {
             DbResponse(success = false, message = "Table '$tableName' not found", errorCode = 404)
+        }
+    }
+
+    /**
+     * EXPLAIN 명령 처리 - 쿼리 실행 계획 생성
+     *
+     * SQL 쿼리를 분석하여 실행 계획(QueryPlan)을 생성하고 JSON으로 반환합니다.
+     * 실행 계획에는 다음 정보가 포함됩니다:
+     * - INDEX_SCAN vs TABLE_SCAN 결정
+     * - Covered Query 여부
+     * - 예상 비용 및 행 수
+     * - Selectivity 계산
+     */
+    private fun handleExplain(request: DbRequest): DbResponse {
+        // ExplainService가 주입되지 않은 경우
+        if (explainService == null) {
+            return DbResponse(
+                success = false,
+                message = "EXPLAIN command is not available (ExplainService not configured)",
+                errorCode = 503
+            )
+        }
+
+        // SQL 쿼리가 제공되지 않은 경우
+        val sql = request.sql
+            ?: return DbResponse(success = false, message = "SQL query is required for EXPLAIN", errorCode = 400)
+
+        return try {
+            // ExplainService를 통해 쿼리 실행 계획 생성
+            val queryPlan = explainService.explain(sql)
+
+            // QueryPlan 객체를 JSON 문자열로 직렬화
+            val queryPlanJson = json.encodeToString<QueryPlan>(queryPlan)
+
+            DbResponse(
+                success = true,
+                message = "Query plan generated successfully",
+                data = queryPlanJson
+            )
+        } catch (e: IllegalArgumentException) {
+            // SQL 파싱 실패
+            DbResponse(
+                success = false,
+                message = "Failed to parse SQL: ${e.message}",
+                errorCode = 400
+            )
+        } catch (e: IllegalStateException) {
+            // 테이블이 존재하지 않는 경우 등
+            DbResponse(
+                success = false,
+                message = "Failed to generate query plan: ${e.message}",
+                errorCode = 404
+            )
+        } catch (e: Exception) {
+            // 기타 예외
+            logger.error("Failed to execute EXPLAIN for connection $connectionId", e)
+            DbResponse(
+                success = false,
+                message = "Internal error: ${e.message}",
+                errorCode = 500
+            )
         }
     }
 }

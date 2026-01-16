@@ -1,4 +1,4 @@
-package study.db.server.engine
+package study.db.server.db_engine
 
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
@@ -182,34 +182,45 @@ class ConnectionManager {
     /**
      * 모든 연결 종료 (서버 종료 시)
      *
-     * TODO [구현 가이드]
-     * 1. 모든 연결에 종료 신호 전송 (graceful)
-     *    - 각 handler에게 shutdown 플래그 설정
-     *    - 또는 소켓 close로 강제 종료
-     * 2. 일정 시간 대기 (예: 5초)
-     * 3. 아직 남은 연결 강제 종료
-     * 4. connections 비우기
-     * 5. 로그 출력: "All connections closed"
-     *
      * 구현 방식:
-     * ```
-     * fun closeAll(gracefulTimeoutMs: Long = 5000) {
-     *     // 1. 모든 연결에 shutdown 신호
-     *     connections.values.forEach { it.initiateShutdown() }
+     * 1. 모든 연결의 소켓을 닫아서 graceful shutdown 유도
+     * 2. 일정 시간 대기하면서 연결이 자연스럽게 종료되기를 기다림
+     * 3. 아직 남은 연결이 있다면 강제로 제거
      *
-     *     // 2. graceful 대기
-     *     val deadline = System.currentTimeMillis() + gracefulTimeoutMs
-     *     while (connections.isNotEmpty() && System.currentTimeMillis() < deadline) {
-     *         Thread.sleep(100)
-     *     }
-     *
-     *     // 3. 남은 연결 강제 종료
-     *     connections.keys.toList().forEach { kill(it) }
-     * }
-     * ```
+     * @param gracefulTimeoutMs graceful shutdown 대기 시간 (기본 5초)
      */
-    fun closeAll() {
-        // TODO: 구현
+    fun closeAll(gracefulTimeoutMs: Long = 5000) {
+        if (connections.isEmpty()) {
+            logger.info("No connections to close")
+            return
+        }
+
+        val initialCount = connections.size
+        logger.info("Closing $initialCount connections...")
+
+        // 1. 모든 연결의 소켓 닫기 (이렇게 하면 ConnectionHandler의 run()에서 예외 발생 → finally에서 정리)
+        connections.values.forEach { handler ->
+            try {
+                handler.closeSocket()
+            } catch (e: Exception) {
+                logger.warn("Failed to close socket for connection ${handler.connectionId}: ${e.message}")
+            }
+        }
+
+        // 2. graceful 대기 - 연결들이 자연스럽게 정리되기를 기다림
+        val deadline = System.currentTimeMillis() + gracefulTimeoutMs
+        while (connections.isNotEmpty() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(100)
+            logger.debug("Waiting for connections to close... (${connections.size} remaining)")
+        }
+
+        // 3. 아직 남은 연결이 있다면 강제로 제거
+        if (connections.isNotEmpty()) {
+            logger.warn("Forcefully removing ${connections.size} remaining connections")
+            connections.clear()
+        }
+
+        logger.info("All connections closed (initially: $initialCount)")
     }
 
     /**

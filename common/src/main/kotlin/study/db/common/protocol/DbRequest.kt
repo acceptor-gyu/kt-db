@@ -8,5 +8,6 @@ data class DbRequest(
     val tableName: String? = null,
     val columns: Map<String, String>? = null,
     val values: Map<String, String>? = null,
-    val condition: String? = null
+    val condition: String? = null,
+    val sql: String? = null  // For EXPLAIN and other raw SQL commands
 )

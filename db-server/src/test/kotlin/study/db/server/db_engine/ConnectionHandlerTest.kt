@@ -1,7 +1,10 @@
-package study.db.server.engine
+package study.db.server.db_engine
 
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.*
-import org.junit.jupiter.api.Assertions.*
 import study.db.common.protocol.DbCommand
 import study.db.common.protocol.DbRequest
 import study.db.common.protocol.ProtocolCodec
@@ -39,7 +42,9 @@ class ConnectionHandlerTest {
         return ConnectionHandler(
             connectionId = connectionIdGenerator.incrementAndGet(),
             socket = socket,
-            tableService = sharedTableService
+            tableService = sharedTableService,
+            connectionManager = null,
+            explainService = null  // EXPLAIN 기능은 테스트에서 제외
         )
     }
 

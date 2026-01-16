@@ -19,5 +19,9 @@ class ElasticsearchConfig {
 
 @ConfigurationProperties(prefix = "elasticsearch.index")
 data class ElasticsearchIndexProperties(
-    var queryLogs: String = "db-query-logs"
+    var queryLogs: String = "db-query-logs",
+    var tableMetadata: String = "db-table-metadata",
+    var indexMetadata: String = "db-index-metadata",
+    var tableStatistics: String = "db-table-statistics",
+    var queryPlans: String = "db-query-plans"
 )

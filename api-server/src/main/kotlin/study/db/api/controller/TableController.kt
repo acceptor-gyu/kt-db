@@ -3,7 +3,8 @@ package study.db.api.controller
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import study.db.api.client.DbClient
-import study.db.common.CreateTableRequest
+import study.db.api.dto.FindQueryPlanResponse
+import study.db.api.dto.SqlQueryRequest
 import study.db.common.protocol.DbCommand
 import study.db.common.protocol.DbRequest
 
@@ -12,12 +13,34 @@ import study.db.common.protocol.DbRequest
 class TableController(
     private val dbClient: DbClient
 ) {
-    @PostMapping
-    fun createTable(@RequestBody request: CreateTableRequest): ResponseEntity<Map<String, Any>> {
+    // e.g. GET /api/tables/query-plan?query=EXPLAIN SELECT * FROM logs;
+    @GetMapping("/query-plan")
+    fun findQueryPlan(@RequestParam(required = true) query: String): ResponseEntity<FindQueryPlanResponse> {
+        // 더미 데이터 반환
+        val dummyResponse = FindQueryPlanResponse(
+            id = 1,
+            selectType = "SIMPLE",
+            table = "logs",
+            type = "ALL",
+            possibleKeys = listOf("idx_user_id", "idx_created_at"),
+            key = null,
+            keyLen = null,
+            rows = 1000,
+            extra = "Using where"
+        )
+
+        return ResponseEntity.ok(dummyResponse)
+    }
+
+    // e.g. POST /api/tables/create
+    // Body: { "query": "CREATE TABLE users (id INT, name VARCHAR(100));" }
+    @PostMapping("/create")
+    fun createTable(@RequestBody request: SqlQueryRequest): ResponseEntity<Map<String, Any>> {
+        // TODO: SQL 쿼리 파싱하여 DbRequest로 변환
         val dbRequest = DbRequest(
             command = DbCommand.CREATE_TABLE,
-            tableName = request.tableName,
-            columns = request.columns
+            tableName = "", // SQL 파싱 필요
+            columns = null
         )
 
         val response = dbClient.send(dbRequest)
@@ -37,15 +60,15 @@ class TableController(
         }
     }
 
-    @PostMapping("/{tableName}/insert")
-    fun insert(
-        @PathVariable tableName: String,
-        @RequestBody values: Map<String, String>
-    ): ResponseEntity<Map<String, Any>> {
+    // e.g. POST /api/tables/insert
+    // Body: { "query": "INSERT INTO users VALUES (1, 'John');" }
+    @PostMapping("/insert")
+    fun insert(@RequestBody request: SqlQueryRequest): ResponseEntity<Map<String, Any>> {
+        // TODO: SQL 쿼리 파싱하여 DbRequest로 변환
         val dbRequest = DbRequest(
             command = DbCommand.INSERT,
-            tableName = tableName,
-            values = values
+            tableName = "", // SQL 파싱 필요
+            values = null
         )
 
         val response = dbClient.send(dbRequest)
@@ -63,11 +86,13 @@ class TableController(
         }
     }
 
-    @GetMapping("/{tableName}")
-    fun select(@PathVariable tableName: String): ResponseEntity<Map<String, Any>> {
+    // e.g. GET /api/tables/select?query=SELECT * FROM users;
+    @GetMapping("/select")
+    fun select(@RequestParam(required = true) query: String): ResponseEntity<Map<String, Any>> {
+        // TODO: SQL 쿼리 파싱하여 DbRequest로 변환
         val dbRequest = DbRequest(
             command = DbCommand.SELECT,
-            tableName = tableName
+            tableName = "" // SQL 파싱 필요
         )
 
         val response = dbClient.send(dbRequest)
@@ -85,11 +110,13 @@ class TableController(
         }
     }
 
-    @DeleteMapping("/{tableName}")
-    fun dropTable(@PathVariable tableName: String): ResponseEntity<Map<String, Any>> {
+    // e.g. DELETE /api/tables/drop?query=DROP TABLE users;
+    @DeleteMapping("/drop")
+    fun dropTable(@RequestParam(required = true) query: String): ResponseEntity<Map<String, Any>> {
+        // TODO: SQL 쿼리 파싱하여 DbRequest로 변환
         val dbRequest = DbRequest(
             command = DbCommand.DROP_TABLE,
-            tableName = tableName
+            tableName = "" // SQL 파싱 필요
         )
 
         val response = dbClient.send(dbRequest)

@@ -6,7 +6,11 @@ import org.springframework.boot.SpringApplication
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.context.annotation.Bean
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations
+import study.db.server.elasticsearch.document.IndexMetadata
 import study.db.server.elasticsearch.document.QueryLog
+import study.db.server.elasticsearch.document.QueryPlan
+import study.db.server.elasticsearch.document.TableMetadata
+import study.db.server.elasticsearch.document.TableStatistics
 
 @SpringBootApplication(scanBasePackages = ["study.db.server.elasticsearch"])
 class InitElasticsearchIndexApp {
@@ -17,37 +21,68 @@ class InitElasticsearchIndexApp {
     fun initIndex(elasticsearchOperations: ElasticsearchOperations): CommandLineRunner {
         return CommandLineRunner { args ->
             try {
-                val indexOps = elasticsearchOperations.indexOps(QueryLog::class.java)
+                val forceMode = args.contains("--force")
 
-                // Check if index exists
-                if (indexOps.exists()) {
-                    logger.info("Index already exists")
+                // Initialize QueryLog index
+                logger.info("Initializing QueryLog index...")
+                initializeIndex(elasticsearchOperations, QueryLog::class.java, "QueryLog", forceMode)
 
-                    // Check for --force flag
-                    if (args.contains("--force")) {
-                        logger.info("Deleting existing index")
-                        indexOps.delete()
-                        logger.info("Index deleted")
-                    } else {
-                        logger.info("Use --force to delete and recreate the index")
-                        return@CommandLineRunner
-                    }
-                }
+                // Initialize TableMetadata index
+                logger.info("Initializing TableMetadata index...")
+                initializeIndex(elasticsearchOperations, TableMetadata::class.java, "TableMetadata", forceMode)
 
-                // Create index
-                logger.info("Creating index")
-                indexOps.create()
+                // Initialize IndexMetadata index
+                logger.info("Initializing IndexMetadata index...")
+                initializeIndex(elasticsearchOperations, IndexMetadata::class.java, "IndexMetadata", forceMode)
 
-                // Create mapping
-                indexOps.putMapping(indexOps.createMapping())
+                // Initialize TableStatistics index
+                logger.info("Initializing TableStatistics index...")
+                initializeIndex(elasticsearchOperations, TableStatistics::class.java, "TableStatistics", forceMode)
 
-                logger.info("Index created successfully")
+                // Initialize QueryPlan index
+                logger.info("Initializing QueryPlan index...")
+                initializeIndex(elasticsearchOperations, QueryPlan::class.java, "QueryPlan", forceMode)
+
+                logger.info("All indices initialized successfully")
 
             } catch (e: Exception) {
-                logger.error("Failed to initialize Elasticsearch index", e)
+                logger.error("Failed to initialize Elasticsearch indices", e)
                 throw e
             }
         }
+    }
+
+    private fun <T> initializeIndex(
+        elasticsearchOperations: ElasticsearchOperations,
+        documentClass: Class<T>,
+        indexName: String,
+        forceMode: Boolean
+    ) {
+        val indexOps = elasticsearchOperations.indexOps(documentClass)
+
+        // Check if index exists
+        if (indexOps.exists()) {
+            logger.info("$indexName index already exists")
+
+            // Check for --force flag
+            if (forceMode) {
+                logger.info("Deleting existing $indexName index")
+                indexOps.delete()
+                logger.info("$indexName index deleted")
+            } else {
+                logger.info("$indexName index already exists. Use --force to delete and recreate")
+                return
+            }
+        }
+
+        // Create index
+        logger.info("Creating $indexName index")
+        indexOps.create()
+
+        // Create mapping
+        indexOps.putMapping(indexOps.createMapping())
+
+        logger.info("$indexName index created successfully")
     }
 
     companion object {

@@ -15,5 +15,5 @@
     </root>
 
     <!-- 테스트 패키지는 DEBUG 레벨로 상세 로그 출력 -->
-    <logger name="study.db.server.engine" level="DEBUG" />
+    <logger name="study.db.server.db_engine" level="DEBUG" />
 </configuration>
