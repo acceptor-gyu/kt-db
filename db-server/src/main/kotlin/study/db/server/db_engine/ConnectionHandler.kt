@@ -11,6 +11,11 @@ import study.db.common.protocol.ProtocolCodec
 import study.db.server.service.TableService
 import study.db.server.elasticsearch.service.ExplainService
 import study.db.server.elasticsearch.document.QueryPlan
+import study.db.server.exception.ColumnNotFoundException
+import study.db.server.exception.TypeMismatchException
+import study.db.server.exception.UnsupportedTypeException
+import study.db.server.exception.ExceptionMapper
+import study.db.server.exception.ResourceAlreadyExistsException
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.IOException
@@ -313,12 +318,14 @@ class ConnectionHandler(
         val columns = request.columns
             ?: return DbResponse(success = false, message = "Columns are required", errorCode = 400)
 
-        if (tableService.tableExists(tableName)) {
-            return DbResponse(success = false, message = "Table '$tableName' already exists", errorCode = 409)
-        }
+        return ExceptionMapper.executeWithExceptionHandling(connectionId) {
+            if (tableService.tableExists(tableName)) {
+                throw ResourceAlreadyExistsException("Table", tableName)
+            }
 
-        val query = tableService.createTable(tableName, columns)
-        return DbResponse(success = true, message = "Table created", data = query)
+            val query = tableService.createTable(tableName, columns)
+            DbResponse(success = true, message = "Table created", data = query)
+        }
     }
 
     private fun handleInsert(request: DbRequest): DbResponse {
@@ -327,11 +334,9 @@ class ConnectionHandler(
         val values = request.values
             ?: return DbResponse(success = false, message = "Values are required", errorCode = 400)
 
-        val success = tableService.insert(tableName, values)
-        return if (success) {
+        return ExceptionMapper.executeWithExceptionHandling(connectionId) {
+            tableService.insert(tableName, values)
             DbResponse(success = true, message = "Data inserted")
-        } else {
-            DbResponse(success = false, message = "Table '$tableName' not found", errorCode = 404)
         }
     }
 
@@ -343,12 +348,12 @@ class ConnectionHandler(
         val tableName = request.tableName
             ?: return DbResponse(success = false, message = "Table name is required", errorCode = 400)
 
-        val table = tableService.select(tableName)
-        return if (table != null) {
+        return ExceptionMapper.executeWithExceptionHandling(connectionId) {
+            val table = tableService.select(tableName)
+                ?: throw IllegalStateException("Table '$tableName' not found")
+
             // Table 객체를 JSON 문자열로 직렬화
             DbResponse(success = true, data = json.encodeToString<Table>(table))
-        } else {
-            DbResponse(success = false, message = "Table '$tableName' not found", errorCode = 404)
         }
     }
 
@@ -360,11 +365,12 @@ class ConnectionHandler(
         val tableName = request.tableName
             ?: return DbResponse(success = false, message = "Table name is required", errorCode = 400)
 
-        val success = tableService.dropTable(tableName)
-        return if (success) {
+        return ExceptionMapper.executeWithExceptionHandling(connectionId) {
+            val success = tableService.dropTable(tableName)
+            if (!success) {
+                throw IllegalStateException("Table '$tableName' not found")
+            }
             DbResponse(success = true, message = "Table '$tableName' dropped")
-        } else {
-            DbResponse(success = false, message = "Table '$tableName' not found", errorCode = 404)
         }
     }
 
@@ -392,7 +398,7 @@ class ConnectionHandler(
         val sql = request.sql
             ?: return DbResponse(success = false, message = "SQL query is required for EXPLAIN", errorCode = 400)
 
-        return try {
+        return ExceptionMapper.executeWithExceptionHandling(connectionId) {
             // ExplainService를 통해 쿼리 실행 계획 생성
             val queryPlan = explainService.explain(sql)
 
@@ -403,28 +409,6 @@ class ConnectionHandler(
                 success = true,
                 message = "Query plan generated successfully",
                 data = queryPlanJson
-            )
-        } catch (e: IllegalArgumentException) {
-            // SQL 파싱 실패
-            DbResponse(
-                success = false,
-                message = "Failed to parse SQL: ${e.message}",
-                errorCode = 400
-            )
-        } catch (e: IllegalStateException) {
-            // 테이블이 존재하지 않는 경우 등
-            DbResponse(
-                success = false,
-                message = "Failed to generate query plan: ${e.message}",
-                errorCode = 404
-            )
-        } catch (e: Exception) {
-            // 기타 예외
-            logger.error("Failed to execute EXPLAIN for connection $connectionId", e)
-            DbResponse(
-                success = false,
-                message = "Internal error: ${e.message}",
-                errorCode = 500
             )
         }
     }

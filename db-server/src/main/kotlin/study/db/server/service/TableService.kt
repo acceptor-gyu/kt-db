@@ -1,6 +1,10 @@
 package study.db.server.service
 
 import study.db.common.Table
+import study.db.server.exception.ColumnNotFoundException
+import study.db.server.exception.TypeMismatchException
+import study.db.server.exception.UnsupportedTypeException
+import study.db.server.validation.TypeValidator
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -41,7 +45,12 @@ class TableService {
     }
 
     /**
-     * 데이터 삽입 (Thread-safe)
+     * 데이터 삽입 (Thread-safe with validation)
+     *
+     * 검증 단계:
+     * 1. 테이블 존재 여부 확인
+     * 2. 컬럼 존재 여부 확인 (정의되지 않은 컬럼 거부)
+     * 3. 타입 검증 (엄격한 타입 매칭)
      *
      * compute를 사용하여 read-modify-write를 atomic하게 처리:
      * 1. 테이블 존재 여부 확인
@@ -51,18 +60,44 @@ class TableService {
      *
      * @param tableName 테이블 이름
      * @param values 삽입할 데이터
-     * @return 성공 여부
+     * @throws IllegalStateException 테이블이 존재하지 않을 때
+     * @throws ColumnNotFoundException 컬럼이 테이블에 정의되지 않았을 때
+     * @throws TypeMismatchException 타입이 일치하지 않을 때
+     * @throws UnsupportedTypeException 지원하지 않는 타입일 때
      */
-    fun insert(tableName: String, values: Map<String, String>): Boolean {
+    fun insert(tableName: String, values: Map<String, String>) {
+        // 1. 테이블 존재 여부 확인
+        val existingTable = tables[tableName]
+            ?: throw IllegalStateException("Table '$tableName' not found")
+
+        // 2. 컬럼 존재 여부 및 타입 검증
+        validateInsertData(existingTable, values)
+
+        // 3. 데이터 삽입 (atomic operation)
         // compute: key에 대한 값을 atomic하게 계산/업데이트
         // 여러 스레드가 동시에 같은 테이블에 insert해도 안전
-        val result = tables.compute(tableName) { _, existingTable ->
-            // 테이블이 없으면 null 반환 (변경 없음)
-            existingTable?.copy(value = existingTable.value + values)
+        tables.compute(tableName) { _, table ->
+            table?.copy(value = table.value + values)
         }
+    }
 
-        // compute 결과가 null이 아니면 성공 (테이블이 존재했음)
-        return result != null
+    /**
+     * INSERT 데이터 검증
+     *
+     * @param table 대상 테이블
+     * @param values 삽입할 데이터
+     * @throws ColumnNotFoundException 정의되지 않은 컬럼
+     * @throws TypeMismatchException 타입 불일치
+     */
+    private fun validateInsertData(table: Table, values: Map<String, String>) {
+        values.forEach { (columnName, value) ->
+            // 컬럼 존재 여부 확인
+            val expectedType = table.dataType[columnName]
+                ?: throw ColumnNotFoundException(table.tableName, columnName)
+
+            // 타입 검증
+            TypeValidator.validate(value, expectedType)
+        }
     }
 
     /**

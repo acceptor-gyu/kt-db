@@ -5,6 +5,10 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
+import study.db.server.exception.ColumnNotFoundException
+import study.db.server.exception.TypeMismatchException
+import study.db.server.exception.UnsupportedTypeException
 
 /**
  * TableService 테스트
@@ -128,12 +132,9 @@ class TableServiceTest {
             )
 
             // When: 데이터 삽입
-            val result = tableService.insert("users", values)
+            assertDoesNotThrow { tableService.insert("users", values) }
 
-            // Then: 삽입 성공
-            assertTrue(result)
-
-            // 데이터 확인
+            // Then: 데이터 확인
             val table = tableService.select("users")
             assertNotNull(table)
             assertEquals(values, table?.value)
@@ -145,11 +146,10 @@ class TableServiceTest {
             // Given: 존재하지 않는 테이블
             val values = mapOf("id" to "1")
 
-            // When: 존재하지 않는 테이블에 삽입 시도
-            val result = tableService.insert("non_existent", values)
-
-            // Then: 삽입 실패
-            assertFalse(result)
+            // When & Then: 존재하지 않는 테이블에 삽입 시도 시 예외 발생
+            assertThrows<IllegalStateException> {
+                tableService.insert("non_existent", values)
+            }
         }
 
         @Test
@@ -177,10 +177,9 @@ class TableServiceTest {
             val emptyValues = emptyMap<String, String>()
 
             // When: 빈 값 삽입
-            val result = tableService.insert("users", emptyValues)
+            assertDoesNotThrow { tableService.insert("users", emptyValues) }
 
-            // Then: 삽입은 성공하지만 데이터는 없음
-            assertTrue(result)
+            // Then: 데이터는 없음
             val table = tableService.select("users")
             assertTrue(table?.value?.isEmpty() ?: false)
         }
@@ -374,7 +373,7 @@ class TableServiceTest {
 
             // Insert
             val userData = mapOf("id" to "1", "name" to "John", "email" to "john@example.com")
-            assertTrue(tableService.insert("users", userData))
+            assertDoesNotThrow { tableService.insert("users", userData) }
 
             // Read
             val table = tableService.select("users")
@@ -384,7 +383,7 @@ class TableServiceTest {
 
             // Update (재삽입)
             val updatedData = mapOf("id" to "1", "name" to "John Doe")
-            assertTrue(tableService.insert("users", updatedData))
+            assertDoesNotThrow { tableService.insert("users", updatedData) }
 
             // Delete
             assertTrue(tableService.dropTable("users"))
@@ -397,7 +396,7 @@ class TableServiceTest {
             // Given: 여러 테이블 생성
             tableService.createTable("users", mapOf("id" to "INT", "name" to "VARCHAR"))
             tableService.createTable("posts", mapOf("id" to "INT", "title" to "VARCHAR"))
-            tableService.createTable("comments", mapOf("id" to "INT", "content" to "TEXT"))
+            tableService.createTable("comments", mapOf("id" to "INT", "content" to "VARCHAR"))
 
             // When: 각 테이블에 데이터 삽입
             tableService.insert("users", mapOf("id" to "1", "name" to "John"))
@@ -418,6 +417,237 @@ class TableServiceTest {
             assertEquals("John", users?.value?.get("name"))
             assertEquals("First Post", posts?.value?.get("title"))
             assertEquals("Great!", comments?.value?.get("content"))
+        }
+    }
+
+    @Nested
+    @DisplayName("타입 검증 테스트")
+    inner class TypeValidationTest {
+
+        @BeforeEach
+        fun setupTable() {
+            tableService.createTable("users", mapOf(
+                "id" to "INT",
+                "name" to "VARCHAR",
+                "email" to "VARCHAR",
+                "age" to "INT",
+                "active" to "BOOLEAN",
+                "created_at" to "TIMESTAMP"
+            ))
+        }
+
+        @Test
+        @DisplayName("INT 타입 검증 - 정상")
+        fun `validates INT type successfully`() {
+            val values = mapOf("id" to "123", "age" to "25")
+            assertDoesNotThrow { tableService.insert("users", values) }
+        }
+
+        @Test
+        @DisplayName("INT 타입 검증 - 실패 (문자열)")
+        fun `fails INT validation with string value`() {
+            val values = mapOf("id" to "abc")
+            val exception = assertThrows<TypeMismatchException> {
+                tableService.insert("users", values)
+            }
+            assertEquals("abc", exception.value)
+            assertEquals("INT", exception.expectedType)
+        }
+
+        @Test
+        @DisplayName("INT 타입 검증 - 실패 (소수점)")
+        fun `fails INT validation with decimal value`() {
+            val values = mapOf("age" to "25.5")
+            assertThrows<TypeMismatchException> {
+                tableService.insert("users", values)
+            }
+        }
+
+        @Test
+        @DisplayName("VARCHAR 타입 검증 - 항상 성공")
+        fun `validates VARCHAR type always succeeds`() {
+            val values = mapOf(
+                "name" to "John Doe",
+                "email" to "john@example.com"
+            )
+            assertDoesNotThrow { tableService.insert("users", values) }
+        }
+
+        @Test
+        @DisplayName("BOOLEAN 타입 검증 - 정상")
+        fun `validates BOOLEAN type successfully`() {
+            val values1 = mapOf("active" to "true")
+            assertDoesNotThrow { tableService.insert("users", values1) }
+
+            val values2 = mapOf("active" to "false")
+            assertDoesNotThrow { tableService.insert("users", values2) }
+
+            val values3 = mapOf("active" to "TRUE")
+            assertDoesNotThrow { tableService.insert("users", values3) }
+        }
+
+        @Test
+        @DisplayName("BOOLEAN 타입 검증 - 실패")
+        fun `fails BOOLEAN validation with invalid value`() {
+            val values = mapOf("active" to "yes")
+            val exception = assertThrows<TypeMismatchException> {
+                tableService.insert("users", values)
+            }
+            assertTrue(exception.message!!.contains("true' or 'false"))
+        }
+
+        @Test
+        @DisplayName("TIMESTAMP 타입 검증 - 정상 (ISO-8601)")
+        fun `validates TIMESTAMP type successfully`() {
+            val values = mapOf("created_at" to "2024-01-15T10:30:00Z")
+            assertDoesNotThrow { tableService.insert("users", values) }
+        }
+
+        @Test
+        @DisplayName("TIMESTAMP 타입 검증 - 정상 (LocalDateTime)")
+        fun `validates TIMESTAMP with LocalDateTime format`() {
+            val values = mapOf("created_at" to "2024-01-15 10:30:00")
+            assertDoesNotThrow { tableService.insert("users", values) }
+        }
+
+        @Test
+        @DisplayName("TIMESTAMP 타입 검증 - 실패")
+        fun `fails TIMESTAMP validation with invalid format`() {
+            val values = mapOf("created_at" to "2024/01/15")
+            assertThrows<TypeMismatchException> {
+                tableService.insert("users", values)
+            }
+        }
+
+        @Test
+        @DisplayName("여러 타입 동시 검증 - 정상")
+        fun `validates multiple types successfully`() {
+            val values = mapOf(
+                "id" to "1",
+                "name" to "Alice",
+                "email" to "alice@example.com",
+                "age" to "30",
+                "active" to "true",
+                "created_at" to "2024-01-15T10:30:00Z"
+            )
+            assertDoesNotThrow { tableService.insert("users", values) }
+        }
+    }
+
+    @Nested
+    @DisplayName("컬럼 존재 여부 검증 테스트")
+    inner class ColumnExistenceTest {
+
+        @BeforeEach
+        fun setupTable() {
+            tableService.createTable("users", mapOf(
+                "id" to "INT",
+                "name" to "VARCHAR"
+            ))
+        }
+
+        @Test
+        @DisplayName("정의된 컬럼 삽입 - 정상")
+        fun `inserts with defined columns successfully`() {
+            val values = mapOf("id" to "1", "name" to "John")
+            assertDoesNotThrow { tableService.insert("users", values) }
+        }
+
+        @Test
+        @DisplayName("정의되지 않은 컬럼 삽입 - 실패")
+        fun `fails to insert undefined column`() {
+            val values = mapOf("id" to "1", "email" to "john@example.com")
+            val exception = assertThrows<ColumnNotFoundException> {
+                tableService.insert("users", values)
+            }
+            assertEquals("users", exception.tableName)
+            assertEquals("email", exception.columnName)
+        }
+
+        @Test
+        @DisplayName("일부 정의되지 않은 컬럼 - 실패")
+        fun `fails when one column is undefined`() {
+            val values = mapOf(
+                "id" to "1",
+                "name" to "John",
+                "age" to "25"  // 정의되지 않음
+            )
+            assertThrows<ColumnNotFoundException> {
+                tableService.insert("users", values)
+            }
+        }
+
+        @Test
+        @DisplayName("빈 값 삽입 - 정상")
+        fun `allows empty values`() {
+            val values = emptyMap<String, String>()
+            assertDoesNotThrow { tableService.insert("users", values) }
+        }
+    }
+
+    @Nested
+    @DisplayName("엣지 케이스 및 통합 테스트")
+    inner class EdgeCasesTest {
+
+        @Test
+        @DisplayName("존재하지 않는 테이블 - 실패")
+        fun `fails when table does not exist`() {
+            val values = mapOf("id" to "1")
+            assertThrows<IllegalStateException> {
+                tableService.insert("non_existent", values)
+            }
+        }
+
+        @Test
+        @DisplayName("INT 범위 최대값 - 정상")
+        fun `accepts INT max value`() {
+            tableService.createTable("test", mapOf("num" to "INT"))
+            val values = mapOf("num" to "2147483647")
+            assertDoesNotThrow { tableService.insert("test", values) }
+        }
+
+        @Test
+        @DisplayName("INT 범위 최소값 - 정상")
+        fun `accepts INT min value`() {
+            tableService.createTable("test", mapOf("num" to "INT"))
+            val values = mapOf("num" to "-2147483648")
+            assertDoesNotThrow { tableService.insert("test", values) }
+        }
+
+        @Test
+        @DisplayName("INT 범위 초과 - 실패")
+        fun `fails when INT value exceeds range`() {
+            tableService.createTable("test", mapOf("num" to "INT"))
+            val values = mapOf("num" to "2147483648")
+            assertThrows<TypeMismatchException> {
+                tableService.insert("test", values)
+            }
+        }
+
+        @Test
+        @DisplayName("지원하지 않는 타입 - 실패")
+        fun `fails with unsupported type`() {
+            tableService.createTable("test", mapOf("data" to "BLOB"))
+            val values = mapOf("data" to "binary_data")
+            assertThrows<UnsupportedTypeException> {
+                tableService.insert("test", values)
+            }
+        }
+
+        @Test
+        @DisplayName("대소문자 무관 타입 검증")
+        fun `validates types case insensitively`() {
+            tableService.createTable("test", mapOf(
+                "id" to "int",
+                "name" to "varchar",
+                "active" to "boolean"
+            ))
+            val values = mapOf(
+                "id" to "1",
+                "name" to "Test",
+                "active" to "true"
+            )
+            assertDoesNotThrow { tableService.insert("test", values) }
         }
     }
 }
