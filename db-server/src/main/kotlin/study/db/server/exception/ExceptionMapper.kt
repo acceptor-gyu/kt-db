@@ -78,7 +78,7 @@ object ExceptionMapper {
     }
 
     /**
-     * Higher-order function으로 예외 처리를 래핑
+     * Higher-order function으로 예외 처리를 래핑 (고차함수: 다른 함수를 인자(argument)로 받거나, 함수 자체를 반환하는 함수)
      *
      * @param connectionId 연결 ID (로깅용)
      * @param block 실행할 비즈니스 로직
