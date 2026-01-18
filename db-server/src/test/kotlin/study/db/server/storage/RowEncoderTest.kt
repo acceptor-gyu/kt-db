@@ -162,4 +162,140 @@ class RowEncoderTest {
             assertArrayEquals(original, decoded)
         }
     }
+
+    @Nested
+    @DisplayName("Multi-Type Row 인코딩/디코딩 테스트")
+    inner class MultiTypeRowTest {
+        private val varcharFieldEncoder = VarcharFieldEncoder()
+        private val booleanFieldEncoder = BooleanFieldEncoder()
+        private val timestampFieldEncoder = TimestampFieldEncoder()
+        private val rowEncoder = RowEncoder(
+            IntFieldEncoder(),
+            varcharFieldEncoder,
+            booleanFieldEncoder,
+            timestampFieldEncoder
+        )
+
+        @Test
+        @DisplayName("모든 타입을 포함한 Row 인코딩/디코딩")
+        fun `encode and decode row with all types`() {
+            val schema = mapOf(
+                "id" to "INT",
+                "name" to "VARCHAR",
+                "active" to "BOOLEAN",
+                "created_at" to "TIMESTAMP"
+            )
+            val row = mapOf(
+                "id" to "123",
+                "name" to "John Doe",
+                "active" to "true",
+                "created_at" to "2024-01-15T10:30:00Z"
+            )
+
+            val encoded = rowEncoder.encodeRow(row, schema)
+            val decoded = rowEncoder.decodeRow(encoded, schema)
+
+            assertEquals("123", decoded["id"])
+            assertEquals("John Doe", decoded["name"])
+            assertEquals("true", decoded["active"])
+            assertEquals("2024-01-15T10:30:00Z", decoded["created_at"])
+        }
+
+        @Test
+        @DisplayName("VARCHAR만 있는 Row 인코딩/디코딩")
+        fun `encode and decode row with VARCHAR only`() {
+            val schema = mapOf(
+                "name" to "VARCHAR",
+                "email" to "VARCHAR"
+            )
+            val row = mapOf(
+                "name" to "Jane",
+                "email" to "jane@example.com"
+            )
+
+            val encoded = rowEncoder.encodeRow(row, schema)
+            val decoded = rowEncoder.decodeRow(encoded, schema)
+
+            assertEquals("Jane", decoded["name"])
+            assertEquals("jane@example.com", decoded["email"])
+        }
+
+        @Test
+        @DisplayName("여러 INT와 VARCHAR 혼합 Row")
+        fun `encode and decode mixed INT and VARCHAR row`() {
+            val schema = mapOf(
+                "id" to "INT",
+                "age" to "INT",
+                "name" to "VARCHAR",
+                "city" to "VARCHAR"
+            )
+            val row = mapOf(
+                "id" to "1",
+                "age" to "30",
+                "name" to "Alice",
+                "city" to "Seoul"
+            )
+
+            val encoded = rowEncoder.encodeRow(row, schema)
+            val decoded = rowEncoder.decodeRow(encoded, schema)
+
+            assertEquals("1", decoded["id"])
+            assertEquals("30", decoded["age"])
+            assertEquals("Alice", decoded["name"])
+            assertEquals("Seoul", decoded["city"])
+        }
+
+        @Test
+        @DisplayName("빈 VARCHAR 값 처리")
+        fun `handles empty VARCHAR values`() {
+            val schema = mapOf(
+                "name" to "VARCHAR",
+                "description" to "VARCHAR"
+            )
+            val row = mapOf(
+                "name" to "Test",
+                "description" to ""
+            )
+
+            val encoded = rowEncoder.encodeRow(row, schema)
+            val decoded = rowEncoder.decodeRow(encoded, schema)
+
+            assertEquals("Test", decoded["name"])
+            assertEquals("", decoded["description"])
+        }
+
+        @Test
+        @DisplayName("컬럼 누락 시 예외 발생")
+        fun `throws exception when column is missing`() {
+            val schema = mapOf(
+                "id" to "INT",
+                "name" to "VARCHAR"
+            )
+            val row = mapOf(
+                "id" to "1"
+                // name 누락
+            )
+
+            assertThrows(IllegalArgumentException::class.java) {
+                rowEncoder.encodeRow(row, schema)
+            }
+        }
+
+        @Test
+        @DisplayName("Row length prefix 검증")
+        fun `verifies row length prefix`() {
+            val schema = mapOf("id" to "INT")
+            val row = mapOf("id" to "123")
+
+            val encoded = rowEncoder.encodeRow(row, schema)
+
+            // First 4 bytes should be row length (excluding the length field itself)
+            val rowLength = java.nio.ByteBuffer.wrap(encoded)
+                .order(java.nio.ByteOrder.BIG_ENDIAN)
+                .getInt()
+
+            assertEquals(4, rowLength)  // INT field is 4 bytes
+            assertEquals(8, encoded.size)  // 4-byte length + 4-byte INT value
+        }
+    }
 }

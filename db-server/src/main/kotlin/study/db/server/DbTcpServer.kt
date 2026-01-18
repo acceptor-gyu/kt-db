@@ -19,8 +19,9 @@ import java.util.concurrent.TimeUnit
  * - MySQL에서는 서버 재시작 시 1부터 다시 시작함
  *
  * [TableService 공유]
- * - TableService는 모든 연결에서 공유 (일단 in-memory DB로 구현)
- * - Thread-safe하게 구현 필요 (ConcurrentHashMap 등 사용)
+ * - TableService는 모든 연결에서 공유
+ * - TableFileManager를 통해 파일 기반 persistence 지원
+ * - Thread-safe하게 구현 (ConcurrentHashMap 사용)
  *
  * [ConnectionManager 기능]
  * - Connection ID 생성
@@ -37,7 +38,8 @@ import java.util.concurrent.TimeUnit
 class DbTcpServer(
     private val port: Int,
     private val maxConnections: Int = 10,
-    private val explainService: ExplainService? = null  // EXPLAIN 명령 지원 (optional)
+    private val explainService: ExplainService? = null,  // EXPLAIN 명령 지원 (optional)
+    private val tableService: TableService? = null  // Spring Bean으로 주입받은 TableService (optional)
 ) {
     companion object {
         private val logger = LoggerFactory.getLogger(DbTcpServer::class.java)
@@ -50,7 +52,8 @@ class DbTcpServer(
     @Volatile
     private var running = false
 
-    private val sharedTableService = TableService()
+    // Spring Bean으로 주입받거나, 없으면 기본 TableService 사용
+    private val sharedTableService = tableService ?: TableService()
 
     /**
      * 활성 연결을 추적하고 관리하는 ConnectionManager
