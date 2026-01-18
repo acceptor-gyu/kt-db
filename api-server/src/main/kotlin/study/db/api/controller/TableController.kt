@@ -3,8 +3,8 @@ package study.db.api.controller
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import study.db.api.client.DbClient
-import study.db.api.dto.FindQueryPlanResponse
 import study.db.api.dto.SqlQueryRequest
+import study.db.api.util.SqlParser
 import study.db.common.protocol.DbCommand
 import study.db.common.protocol.DbRequest
 
@@ -15,73 +15,82 @@ class TableController(
 ) {
     // e.g. GET /api/tables/query-plan?query=EXPLAIN SELECT * FROM logs;
     @GetMapping("/query-plan")
-    fun findQueryPlan(@RequestParam(required = true) query: String): ResponseEntity<FindQueryPlanResponse> {
-        // 더미 데이터 반환
-        val dummyResponse = FindQueryPlanResponse(
-            id = 1,
-            selectType = "SIMPLE",
-            table = "logs",
-            type = "ALL",
-            possibleKeys = listOf("idx_user_id", "idx_created_at"),
-            key = null,
-            keyLen = null,
-            rows = 1000,
-            extra = "Using where"
-        )
+    fun findQueryPlan(@RequestParam(required = true) query: String): ResponseEntity<Any> {
+        return try {
+            val dbRequest = SqlParser.parse(query)
+            val response = dbClient.send(dbRequest)
 
-        return ResponseEntity.ok(dummyResponse)
+            if (response.success) {
+                ResponseEntity.ok(mapOf(
+                    "success" to true,
+                    "data" to (response.data ?: "")
+                ))
+            } else {
+                ResponseEntity.badRequest().body(mapOf(
+                    "success" to false,
+                    "message" to (response.message ?: "Failed to get query plan")
+                ))
+            }
+        } catch (e: Exception) {
+            ResponseEntity.badRequest().body(mapOf(
+                "success" to false,
+                "message" to "Failed to parse query: ${e.message}"
+            ))
+        }
     }
 
     // e.g. POST /api/tables/create
     // Body: { "query": "CREATE TABLE users (id INT, name VARCHAR(100));" }
     @PostMapping("/create")
     fun createTable(@RequestBody request: SqlQueryRequest): ResponseEntity<Map<String, Any>> {
-        // TODO: SQL 쿼리 파싱하여 DbRequest로 변환
-        val dbRequest = DbRequest(
-            command = DbCommand.CREATE_TABLE,
-            tableName = "", // SQL 파싱 필요
-            columns = null
-        )
+        return try {
+            val dbRequest = SqlParser.parse(request.query)
+            val response = dbClient.send(dbRequest)
 
-        val response = dbClient.send(dbRequest)
-
-        return if (response.success) {
-            ResponseEntity.ok(mapOf(
-                "success" to true,
-                "message" to (response.message ?: "Table created"),
-                "data" to (response.data ?: "")
-            ))
-        } else {
+            if (response.success) {
+                ResponseEntity.ok(mapOf(
+                    "success" to true,
+                    "message" to (response.message ?: "Table created"),
+                    "data" to (response.data ?: "")
+                ))
+            } else {
+                ResponseEntity.badRequest().body(mapOf(
+                    "success" to false,
+                    "message" to (response.message ?: "Failed to create table"),
+                    "errorCode" to (response.errorCode ?: -1)
+                ))
+            }
+        } catch (e: Exception) {
             ResponseEntity.badRequest().body(mapOf(
                 "success" to false,
-                "message" to (response.message ?: "Failed to create table"),
-                "errorCode" to (response.errorCode ?: -1)
+                "message" to "Failed to parse query: ${e.message}"
             ))
         }
     }
 
     // e.g. POST /api/tables/insert
-    // Body: { "query": "INSERT INTO users VALUES (1, 'John');" }
+    // Body: { "query": "INSERT INTO users VALUES (id=\"1\", name=\"John\");" }
     @PostMapping("/insert")
     fun insert(@RequestBody request: SqlQueryRequest): ResponseEntity<Map<String, Any>> {
-        // TODO: SQL 쿼리 파싱하여 DbRequest로 변환
-        val dbRequest = DbRequest(
-            command = DbCommand.INSERT,
-            tableName = "", // SQL 파싱 필요
-            values = null
-        )
+        return try {
+            val dbRequest = SqlParser.parse(request.query)
+            val response = dbClient.send(dbRequest)
 
-        val response = dbClient.send(dbRequest)
-
-        return if (response.success) {
-            ResponseEntity.ok(mapOf(
-                "success" to true,
-                "message" to (response.message ?: "Data inserted")
-            ))
-        } else {
+            if (response.success) {
+                ResponseEntity.ok(mapOf(
+                    "success" to true,
+                    "message" to (response.message ?: "Data inserted")
+                ))
+            } else {
+                ResponseEntity.badRequest().body(mapOf(
+                    "success" to false,
+                    "message" to (response.message ?: "Failed to insert data")
+                ))
+            }
+        } catch (e: Exception) {
             ResponseEntity.badRequest().body(mapOf(
                 "success" to false,
-                "message" to (response.message ?: "Failed to insert data")
+                "message" to "Failed to parse query: ${e.message}"
             ))
         }
     }
@@ -89,23 +98,25 @@ class TableController(
     // e.g. GET /api/tables/select?query=SELECT * FROM users;
     @GetMapping("/select")
     fun select(@RequestParam(required = true) query: String): ResponseEntity<Map<String, Any>> {
-        // TODO: SQL 쿼리 파싱하여 DbRequest로 변환
-        val dbRequest = DbRequest(
-            command = DbCommand.SELECT,
-            tableName = "" // SQL 파싱 필요
-        )
+        return try {
+            val dbRequest = SqlParser.parse(query)
+            val response = dbClient.send(dbRequest)
 
-        val response = dbClient.send(dbRequest)
-
-        return if (response.success) {
-            ResponseEntity.ok(mapOf(
-                "success" to true,
-                "data" to (response.data ?: "")
-            ))
-        } else {
+            if (response.success) {
+                ResponseEntity.ok(mapOf(
+                    "success" to true,
+                    "data" to (response.data ?: "")
+                ))
+            } else {
+                ResponseEntity.badRequest().body(mapOf(
+                    "success" to false,
+                    "message" to (response.message ?: "Failed to select data")
+                ))
+            }
+        } catch (e: Exception) {
             ResponseEntity.badRequest().body(mapOf(
                 "success" to false,
-                "message" to (response.message ?: "Failed to select data")
+                "message" to "Failed to parse query: ${e.message}"
             ))
         }
     }
@@ -113,23 +124,25 @@ class TableController(
     // e.g. DELETE /api/tables/drop?query=DROP TABLE users;
     @DeleteMapping("/drop")
     fun dropTable(@RequestParam(required = true) query: String): ResponseEntity<Map<String, Any>> {
-        // TODO: SQL 쿼리 파싱하여 DbRequest로 변환
-        val dbRequest = DbRequest(
-            command = DbCommand.DROP_TABLE,
-            tableName = "" // SQL 파싱 필요
-        )
+        return try {
+            val dbRequest = SqlParser.parse(query)
+            val response = dbClient.send(dbRequest)
 
-        val response = dbClient.send(dbRequest)
-
-        return if (response.success) {
-            ResponseEntity.ok(mapOf(
-                "success" to true,
-                "message" to (response.message ?: "Table dropped")
-            ))
-        } else {
+            if (response.success) {
+                ResponseEntity.ok(mapOf(
+                    "success" to true,
+                    "message" to (response.message ?: "Table dropped")
+                ))
+            } else {
+                ResponseEntity.badRequest().body(mapOf(
+                    "success" to false,
+                    "message" to (response.message ?: "Failed to drop table")
+                ))
+            }
+        } catch (e: Exception) {
             ResponseEntity.badRequest().body(mapOf(
                 "success" to false,
-                "message" to (response.message ?: "Failed to drop table")
+                "message" to "Failed to parse query: ${e.message}"
             ))
         }
     }
