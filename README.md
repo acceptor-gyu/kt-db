@@ -601,13 +601,97 @@ cd db-server
 
 ## 빌드 및 실행
 
+### 방법 1: Docker Compose (추천)
+
+전체 시스템을 한 번에 실행합니다 (Elasticsearch + Kibana + DB Server + API Server).
+
 ```bash
-# 빌드
+# 전체 서비스 실행
+docker compose up -d --build
+
+# 서비스 상태 확인
+docker compose ps
+
+# API 테스트
+curl http://localhost:8080/api/tables/ping
+
+# 로그 확인
+docker compose logs -f api-server
+
+# 서비스 중지
+docker compose down
+```
+
+**포트 정보:**
+- API Server: `http://localhost:8080`
+- DB Server: `tcp://localhost:9000`
+- Elasticsearch: `http://localhost:9200`
+- Kibana: `http://localhost:5601`
+
+**데이터 영속성:**
+- 테이블 데이터: `db_db-server-data` 볼륨에 저장
+- Elasticsearch 데이터: `db_elasticsearch-data` 볼륨에 저장
+
+자세한 Docker 사용법은 [DOCKER_GUIDE.md](./DOCKER_GUIDE.md)를 참조하세요.
+
+### 방법 2: 로컬 실행 (Gradle)
+
+Gradle을 사용하여 직접 실행합니다.
+
+```bash
+# 전체 빌드
 ./gradlew build
 
-# 서버 실행
-./gradlew bootRun
+# DB 서버 실행
+./gradlew :db-server:bootRun
+
+# API 서버 실행 (별도 터미널)
+./gradlew :api-server:bootRun
 
 # 테스트
 ./gradlew test
 ```
+
+**주의:** Elasticsearch와 Kibana가 필요한 EXPLAIN 기능을 사용하려면 먼저 Docker Compose로 Elasticsearch를 실행해야 합니다:
+```bash
+docker compose up -d elasticsearch kibana
+```
+
+## API 사용 방법
+
+### REST API 엔드포인트
+
+API 서버는 HTTP REST API를 제공합니다.
+
+```bash
+# CREATE TABLE
+curl -X POST http://localhost:8080/api/tables/create \
+  -H "Content-Type: application/json" \
+  -d '{"query": "CREATE TABLE users (id INT, name VARCHAR, age INT)"}'
+
+# INSERT
+curl -X POST http://localhost:8080/api/tables/insert \
+  -H "Content-Type: application/json" \
+  -d '{"query": "INSERT INTO users VALUES (id=\"1\", name=\"John\", age=\"30\")"}'
+
+# SELECT
+curl -X GET 'http://localhost:8080/api/tables/select?query=SELECT%20*%20FROM%20users'
+
+# EXPLAIN
+curl -X GET 'http://localhost:8080/api/tables/query-plan?query=EXPLAIN%20SELECT%20*%20FROM%20users'
+
+# DROP TABLE
+curl -X DELETE 'http://localhost:8080/api/tables/drop?query=DROP%20TABLE%20users'
+```
+
+### 자동화된 테스트
+
+```bash
+# 전체 테스트 시나리오 실행 (5개 테이블, 19개 레코드)
+cd api-server
+./test-api-requests.sh
+```
+
+자세한 API 사용법은 다음 문서를 참조하세요:
+- [API_USAGE.md](./api-server/API_USAGE.md) - 전체 API 가이드
+- [TEST_README.md](./api-server/TEST_README.md) - 테스트 방법

@@ -45,21 +45,52 @@ services:
       dockerfile: db-server/Dockerfile
     container_name: db-server
     environment:
-      - elasticsearch.host=elasticsearch
-      - elasticsearch.port=9200
-      - elasticsearch.scheme=http
+      - SPRING_ELASTICSEARCH_URIS=http://elasticsearch:9200
       - elasticsearch.index.query-logs=db-query-logs
+      - db.storage.directory=/app/data
+      - db.storage.enabled=true
     ports:
       - "9000:9000"
+    volumes:
+      - db-server-data:/app/data
     depends_on:
       elasticsearch:
         condition: service_healthy
     networks:
       - db-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 9000 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api-server:
+    build:
+      context: .
+      dockerfile: api-server/Dockerfile
+    container_name: api-server
+    environment:
+      - db.server.host=db-server
+      - db.server.port=9000
+    ports:
+      - "8080:8080"
+    depends_on:
+      db-server:
+        condition: service_healthy
+    networks:
+      - db-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/api/tables/ping || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   elasticsearch-data:
+    driver: local
+  db-server-data:
     driver: local
 
 networks:
