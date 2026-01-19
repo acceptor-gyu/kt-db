@@ -4,9 +4,6 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import study.db.api.client.DbClient
 import study.db.api.dto.SqlQueryRequest
-import study.db.api.util.SqlParser
-import study.db.common.protocol.DbCommand
-import study.db.common.protocol.DbRequest
 
 @RestController
 @RequestMapping("/api/tables")
@@ -17,8 +14,7 @@ class TableController(
     @GetMapping("/query-plan")
     fun findQueryPlan(@RequestParam(required = true) query: String): ResponseEntity<Any> {
         return try {
-            val dbRequest = SqlParser.parse(query)
-            val response = dbClient.send(dbRequest)
+            val response = dbClient.send(query)
 
             if (response.success) {
                 ResponseEntity.ok(mapOf(
@@ -34,7 +30,7 @@ class TableController(
         } catch (e: Exception) {
             ResponseEntity.badRequest().body(mapOf(
                 "success" to false,
-                "message" to "Failed to parse query: ${e.message}"
+                "message" to "Failed to execute query: ${e.message}"
             ))
         }
     }
@@ -44,8 +40,7 @@ class TableController(
     @PostMapping("/create")
     fun createTable(@RequestBody request: SqlQueryRequest): ResponseEntity<Map<String, Any>> {
         return try {
-            val dbRequest = SqlParser.parse(request.query)
-            val response = dbClient.send(dbRequest)
+            val response = dbClient.send(request.query)
 
             if (response.success) {
                 ResponseEntity.ok(mapOf(
@@ -63,7 +58,7 @@ class TableController(
         } catch (e: Exception) {
             ResponseEntity.badRequest().body(mapOf(
                 "success" to false,
-                "message" to "Failed to parse query: ${e.message}"
+                "message" to "Failed to execute query: ${e.message}"
             ))
         }
     }
@@ -73,8 +68,7 @@ class TableController(
     @PostMapping("/insert")
     fun insert(@RequestBody request: SqlQueryRequest): ResponseEntity<Map<String, Any>> {
         return try {
-            val dbRequest = SqlParser.parse(request.query)
-            val response = dbClient.send(dbRequest)
+            val response = dbClient.send(request.query)
 
             if (response.success) {
                 ResponseEntity.ok(mapOf(
@@ -90,7 +84,7 @@ class TableController(
         } catch (e: Exception) {
             ResponseEntity.badRequest().body(mapOf(
                 "success" to false,
-                "message" to "Failed to parse query: ${e.message}"
+                "message" to "Failed to execute query: ${e.message}"
             ))
         }
     }
@@ -99,8 +93,7 @@ class TableController(
     @GetMapping("/select")
     fun select(@RequestParam(required = true) query: String): ResponseEntity<Map<String, Any>> {
         return try {
-            val dbRequest = SqlParser.parse(query)
-            val response = dbClient.send(dbRequest)
+            val response = dbClient.send(query)
 
             if (response.success) {
                 ResponseEntity.ok(mapOf(
@@ -116,7 +109,7 @@ class TableController(
         } catch (e: Exception) {
             ResponseEntity.badRequest().body(mapOf(
                 "success" to false,
-                "message" to "Failed to parse query: ${e.message}"
+                "message" to "Failed to execute query: ${e.message}"
             ))
         }
     }
@@ -125,8 +118,7 @@ class TableController(
     @DeleteMapping("/drop")
     fun dropTable(@RequestParam(required = true) query: String): ResponseEntity<Map<String, Any>> {
         return try {
-            val dbRequest = SqlParser.parse(query)
-            val response = dbClient.send(dbRequest)
+            val response = dbClient.send(query)
 
             if (response.success) {
                 ResponseEntity.ok(mapOf(
@@ -142,7 +134,7 @@ class TableController(
         } catch (e: Exception) {
             ResponseEntity.badRequest().body(mapOf(
                 "success" to false,
-                "message" to "Failed to parse query: ${e.message}"
+                "message" to "Failed to execute query: ${e.message}"
             ))
         }
     }
@@ -150,8 +142,7 @@ class TableController(
     @GetMapping("/ping")
     fun ping(): ResponseEntity<Map<String, Any>> {
         return try {
-            val dbRequest = DbRequest(command = DbCommand.PING)
-            val response = dbClient.send(dbRequest)
+            val response = dbClient.send("PING")
 
             ResponseEntity.ok(mapOf(
                 "success" to response.success,
