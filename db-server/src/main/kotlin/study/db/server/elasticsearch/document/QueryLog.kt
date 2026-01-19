@@ -6,7 +6,7 @@ import org.springframework.data.elasticsearch.annotations.Field
 import org.springframework.data.elasticsearch.annotations.FieldType
 import java.time.Instant
 
-@Document(indexName = "#{@elasticsearchIndexProperties.queryLogs}")
+@Document(indexName = "db-query-logs")
 data class QueryLog(
     @Id
     @Field(name = "query_id", type = FieldType.Keyword)

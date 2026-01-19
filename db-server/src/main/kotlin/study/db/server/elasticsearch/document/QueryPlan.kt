@@ -6,7 +6,7 @@ import org.springframework.data.elasticsearch.annotations.Field
 import org.springframework.data.elasticsearch.annotations.FieldType
 import java.time.Instant
 
-@Document(indexName = "#{@elasticsearchIndexProperties.queryPlans}")
+@Document(indexName = "db-query-plans")
 data class QueryPlan(
     @Id
     @Field(name = "plan_id", type = FieldType.Keyword)

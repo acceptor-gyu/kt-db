@@ -6,7 +6,7 @@ import org.springframework.data.elasticsearch.annotations.Field
 import org.springframework.data.elasticsearch.annotations.FieldType
 import java.time.Instant
 
-@Document(indexName = "#{@elasticsearchIndexProperties.tableStatistics}")
+@Document(indexName = "db-table-statistics")
 data class TableStatistics(
     @Id
     @Field(name = "stats_id", type = FieldType.Keyword)

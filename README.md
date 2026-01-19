@@ -70,8 +70,8 @@ Kotlin으로 구현하는 In-Memory Database
 - **역할**: 개별 클라이언트 연결 처리
 - **인스턴스**: 클라이언트 연결당 1개
 - **책임**:
-  - 핸드셰이크 및 인증
-  - 클라이언트 명령 파싱 및 처리
+  - SQL 문자열 수신 및 파싱
+  - 클라이언트 명령 처리
   - TableService 호출
   - 연결 종료 시 리소스 정리 및 ConnectionManager에서 unregister
 
@@ -622,11 +622,19 @@ docker compose logs -f api-server
 docker compose down
 ```
 
-**포트 정보:**
+**포트 정보 (Docker):**
+- API Server: `http://localhost:8081`
+- DB Server: `tcp://localhost:9001`
+- Elasticsearch: `http://localhost:9201`
+- Kibana: `http://localhost:5602`
+
+**포트 정보 (로컬):**
 - API Server: `http://localhost:8080`
 - DB Server: `tcp://localhost:9000`
 - Elasticsearch: `http://localhost:9200`
 - Kibana: `http://localhost:5601`
+
+**동시 실행 가능:** 로컬과 Docker가 서로 다른 포트를 사용하므로 같은 PC에서 동시에 실행할 수 있습니다. 자세한 내용은 [PROFILES.md](./PROFILES.md)를 참조하세요.
 
 **데이터 영속성:**
 - 테이블 데이터: `db_db-server-data` 볼륨에 저장
@@ -663,25 +671,34 @@ docker compose up -d elasticsearch kibana
 
 API 서버는 HTTP REST API를 제공합니다.
 
+**Docker 환경 (포트 8081):**
+
 ```bash
 # CREATE TABLE
-curl -X POST http://localhost:8080/api/tables/create \
+curl -X POST http://localhost:8081/api/tables/create \
   -H "Content-Type: application/json" \
   -d '{"query": "CREATE TABLE users (id INT, name VARCHAR, age INT)"}'
 
 # INSERT
-curl -X POST http://localhost:8080/api/tables/insert \
+curl -X POST http://localhost:8081/api/tables/insert \
   -H "Content-Type: application/json" \
   -d '{"query": "INSERT INTO users VALUES (id=\"1\", name=\"John\", age=\"30\")"}'
 
 # SELECT
-curl -X GET 'http://localhost:8080/api/tables/select?query=SELECT%20*%20FROM%20users'
+curl -X GET 'http://localhost:8081/api/tables/select?query=SELECT%20*%20FROM%20users'
 
 # EXPLAIN
-curl -X GET 'http://localhost:8080/api/tables/query-plan?query=EXPLAIN%20SELECT%20*%20FROM%20users'
+curl -X GET 'http://localhost:8081/api/tables/query-plan?query=EXPLAIN%20SELECT%20*%20FROM%20users'
 
 # DROP TABLE
-curl -X DELETE 'http://localhost:8080/api/tables/drop?query=DROP%20TABLE%20users'
+curl -X DELETE 'http://localhost:8081/api/tables/drop?query=DROP%20TABLE%20users'
+```
+
+**로컬 환경 (포트 8080):**
+
+```bash
+# 포트만 8080으로 변경하면 됩니다
+curl -X POST http://localhost:8080/api/tables/create ...
 ```
 
 ### 자동화된 테스트

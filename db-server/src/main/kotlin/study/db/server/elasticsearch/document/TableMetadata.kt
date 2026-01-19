@@ -6,7 +6,7 @@ import org.springframework.data.elasticsearch.annotations.Field
 import org.springframework.data.elasticsearch.annotations.FieldType
 import java.time.Instant
 
-@Document(indexName = "#{@elasticsearchIndexProperties.tableMetadata}")
+@Document(indexName = "db-table-metadata")
 data class TableMetadata(
     @Id
     @Field(name = "table_id", type = FieldType.Keyword)

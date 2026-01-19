@@ -1,11 +1,12 @@
 package study.db.server.db_engine
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.SerializationFeature
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
 import org.slf4j.LoggerFactory
 import study.db.common.Table
-import study.db.common.protocol.DbCommand
-import study.db.common.protocol.DbRequest
 import study.db.common.protocol.DbResponse
 import study.db.common.protocol.ProtocolCodec
 import study.db.server.service.TableService
@@ -74,6 +75,10 @@ class ConnectionHandler(
 
     val properties = Properties()
     private val json = Json { encodeDefaults = true }
+    private val objectMapper = ObjectMapper()
+        .registerModule(JavaTimeModule())
+        .enable(SerializationFeature.INDENT_OUTPUT)
+        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
 
     /**
      * 클래스패스에서 application.properties 파일을 읽어서 인증 정보(user, password)를 로드합니다.
@@ -124,13 +129,15 @@ class ConnectionHandler(
      */
     override fun run() {
         try {
-            // application level handshake
-            sendHandshake()
-            state = ConnectionState.HANDSHAKE_SENT
-
+            // Use ProtocolCodec to communicate with clients
             while (!socket.isClosed) {
-                val message = input.readUTF()
-                handleMessage(message)
+                val requestBytes = ProtocolCodec.readMessage(input)
+                val sql = ProtocolCodec.decodeRequest(requestBytes)
+
+                val response = processRequest(sql)
+
+                val responseBytes = ProtocolCodec.encodeResponse(response)
+                ProtocolCodec.writeMessage(output, responseBytes)
             }
         } catch (e: java.io.EOFException) {
             // 클라이언트가 정상적으로 연결을 종료한 경우
@@ -278,9 +285,9 @@ class ConnectionHandler(
         socket.use { client ->
             try {
                 val requestBytes = ProtocolCodec.readMessage(client.getInputStream())
-                val request = ProtocolCodec.decodeRequest(requestBytes)
+                val sql = ProtocolCodec.decodeRequest(requestBytes)
 
-                val response = processRequest(request)
+                val response = processRequest(sql)
 
                 val responseBytes = ProtocolCodec.encodeResponse(response)
                 ProtocolCodec.writeMessage(client.getOutputStream(), responseBytes)
@@ -300,23 +307,46 @@ class ConnectionHandler(
         }
     }
 
-    private fun processRequest(request: DbRequest): DbResponse {
-        return when (request.command) {
-            DbCommand.CREATE_TABLE -> handleCreateTable(request)
-            DbCommand.INSERT -> handleInsert(request)
-            DbCommand.SELECT -> handleSelect(request)
-            DbCommand.DELETE -> handleDelete(request)
-            DbCommand.DROP_TABLE -> handleDropTable(request)
-            DbCommand.PING -> DbResponse(success = true, message = "pong")
-            DbCommand.EXPLAIN -> handleExplain(request)
+    /**
+     * SQL 문자열 처리 - SQL 문자열을 파싱하여 적절한 핸들러로 라우팅
+     */
+    private fun processRequest(sql: String): DbResponse {
+        val trimmedSql = sql.trim().trimEnd(';')
+
+        // Handle special PING command
+        if (trimmedSql.equals("PING", ignoreCase = true)) {
+            return DbResponse(success = true, message = "pong")
+        }
+
+        return when {
+            trimmedSql.startsWith("CREATE TABLE", ignoreCase = true) -> parseAndHandleCreateTable(trimmedSql)
+            trimmedSql.startsWith("INSERT INTO", ignoreCase = true) -> parseAndHandleInsert(trimmedSql)
+            trimmedSql.startsWith("SELECT", ignoreCase = true) -> parseAndHandleSelect(trimmedSql)
+            trimmedSql.startsWith("DROP TABLE", ignoreCase = true) -> parseAndHandleDropTable(trimmedSql)
+            trimmedSql.startsWith("EXPLAIN", ignoreCase = true) -> parseAndHandleExplain(trimmedSql)
+            else -> DbResponse(success = false, message = "Unsupported SQL query: $sql", errorCode = 400)
         }
     }
 
-    private fun handleCreateTable(request: DbRequest): DbResponse {
-        val tableName = request.tableName
-            ?: return DbResponse(success = false, message = "Table name is required", errorCode = 400)
-        val columns = request.columns
-            ?: return DbResponse(success = false, message = "Columns are required", errorCode = 400)
+    /**
+     * CREATE TABLE users (id INT, name VARCHAR)
+     */
+    private fun parseAndHandleCreateTable(sql: String): DbResponse {
+        val regex = Regex("""CREATE\s+TABLE\s+(\w+)\s*\(([^)]+)\)""", RegexOption.IGNORE_CASE)
+        val match = regex.find(sql)
+            ?: return DbResponse(success = false, message = "Invalid CREATE TABLE syntax: $sql", errorCode = 400)
+
+        val tableName = match.groupValues[1]
+        val columnsPart = match.groupValues[2]
+
+        // Parse columns: "id INT, name VARCHAR"
+        val columns = mutableMapOf<String, String>()
+        columnsPart.split(",").forEach { columnDef ->
+            val parts = columnDef.trim().split(Regex("\\s+"))
+            if (parts.size >= 2) {
+                columns[parts[0]] = parts[1].uppercase()
+            }
+        }
 
         return ExceptionMapper.executeWithExceptionHandling(connectionId) {
             if (tableService.tableExists(tableName)) {
@@ -328,11 +358,29 @@ class ConnectionHandler(
         }
     }
 
-    private fun handleInsert(request: DbRequest): DbResponse {
-        val tableName = request.tableName
-            ?: return DbResponse(success = false, message = "Table name is required", errorCode = 400)
-        val values = request.values
-            ?: return DbResponse(success = false, message = "Values are required", errorCode = 400)
+    /**
+     * INSERT INTO users VALUES (id="1", name="John")
+     */
+    private fun parseAndHandleInsert(sql: String): DbResponse {
+        val regex = Regex("""INSERT\s+INTO\s+(\w+)\s+VALUES\s*\(([^)]+)\)""", RegexOption.IGNORE_CASE)
+        val match = regex.find(sql)
+            ?: return DbResponse(success = false, message = "Invalid INSERT syntax: $sql", errorCode = 400)
+
+        val tableName = match.groupValues[1]
+        val valuesPart = match.groupValues[2]
+
+        // Parse values: id="1", name="John"
+        val values = mutableMapOf<String, String>()
+        val valueRegex = Regex("""(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s,)]+))""")
+        valueRegex.findAll(valuesPart).forEach { valueMatch ->
+            val columnName = valueMatch.groupValues[1]
+            val value = valueMatch.groupValues[2].ifEmpty {
+                valueMatch.groupValues[3].ifEmpty {
+                    valueMatch.groupValues[4]
+                }
+            }
+            values[columnName] = value
+        }
 
         return ExceptionMapper.executeWithExceptionHandling(connectionId) {
             tableService.insert(tableName, values)
@@ -341,12 +389,16 @@ class ConnectionHandler(
     }
 
     /**
-     * SELECT 명령 처리 - 테이블 조회
-     * Json 직렬화를 통해 Table 객체를 문자열로 변환하여 반환
+     * SELECT * FROM users
      */
-    private fun handleSelect(request: DbRequest): DbResponse {
-        val tableName = request.tableName
-            ?: return DbResponse(success = false, message = "Table name is required", errorCode = 400)
+    private fun parseAndHandleSelect(sql: String): DbResponse {
+        val regex = Regex("""SELECT\s+.+?\s+FROM\s+(\w+)(?:\s+WHERE\s+(.+))?""", RegexOption.IGNORE_CASE)
+        val match = regex.find(sql)
+            ?: return DbResponse(success = false, message = "Invalid SELECT syntax: $sql", errorCode = 400)
+
+        val tableName = match.groupValues[1]
+        // Note: condition is parsed but not currently used by tableService
+        // val condition = match.groupValues.getOrNull(2)?.takeIf { it.isNotBlank() }
 
         return ExceptionMapper.executeWithExceptionHandling(connectionId) {
             val table = tableService.select(tableName)
@@ -357,13 +409,15 @@ class ConnectionHandler(
         }
     }
 
-    private fun handleDelete(request: DbRequest): DbResponse {
-        return DbResponse(success = false, message = "DELETE not implemented yet", errorCode = 501)
-    }
+    /**
+     * DROP TABLE users
+     */
+    private fun parseAndHandleDropTable(sql: String): DbResponse {
+        val regex = Regex("""DROP\s+TABLE\s+(\w+)""", RegexOption.IGNORE_CASE)
+        val match = regex.find(sql)
+            ?: return DbResponse(success = false, message = "Invalid DROP TABLE syntax: $sql", errorCode = 400)
 
-    private fun handleDropTable(request: DbRequest): DbResponse {
-        val tableName = request.tableName
-            ?: return DbResponse(success = false, message = "Table name is required", errorCode = 400)
+        val tableName = match.groupValues[1]
 
         return ExceptionMapper.executeWithExceptionHandling(connectionId) {
             val success = tableService.dropTable(tableName)
@@ -375,16 +429,9 @@ class ConnectionHandler(
     }
 
     /**
-     * EXPLAIN 명령 처리 - 쿼리 실행 계획 생성
-     *
-     * SQL 쿼리를 분석하여 실행 계획(QueryPlan)을 생성하고 JSON으로 반환합니다.
-     * 실행 계획에는 다음 정보가 포함됩니다:
-     * - INDEX_SCAN vs TABLE_SCAN 결정
-     * - Covered Query 여부
-     * - 예상 비용 및 행 수
-     * - Selectivity 계산
+     * EXPLAIN SELECT * FROM users
      */
-    private fun handleExplain(request: DbRequest): DbResponse {
+    private fun parseAndHandleExplain(sql: String): DbResponse {
         // ExplainService가 주입되지 않은 경우
         if (explainService == null) {
             return DbResponse(
@@ -394,16 +441,18 @@ class ConnectionHandler(
             )
         }
 
-        // SQL 쿼리가 제공되지 않은 경우
-        val sql = request.sql
-            ?: return DbResponse(success = false, message = "SQL query is required for EXPLAIN", errorCode = 400)
+        val regex = Regex("""EXPLAIN\s+(.+)""", RegexOption.IGNORE_CASE)
+        val match = regex.find(sql)
+            ?: return DbResponse(success = false, message = "Invalid EXPLAIN syntax: $sql", errorCode = 400)
+
+        val innerQuery = match.groupValues[1]
 
         return ExceptionMapper.executeWithExceptionHandling(connectionId) {
             // ExplainService를 통해 쿼리 실행 계획 생성
-            val queryPlan = explainService.explain(sql)
+            val queryPlan = explainService.explain(innerQuery)
 
             // QueryPlan 객체를 JSON 문자열로 직렬화
-            val queryPlanJson = json.encodeToString<QueryPlan>(queryPlan)
+            val queryPlanJson = objectMapper.writeValueAsString(queryPlan)
 
             DbResponse(
                 success = true,

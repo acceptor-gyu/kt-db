@@ -5,6 +5,7 @@ import study.db.server.db_engine.ConnectionHandler
 import study.db.server.db_engine.ConnectionManager
 import study.db.server.service.TableService
 import study.db.server.elasticsearch.service.ExplainService
+import java.net.InetAddress
 import java.net.ServerSocket
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
@@ -66,7 +67,8 @@ class DbTcpServer(
     private val connectionManager = ConnectionManager()
 
     fun start() {
-        serverSocket = ServerSocket(port)
+        // Bind to 0.0.0.0 (all IPv4 interfaces) to allow connections from other containers
+        serverSocket = ServerSocket(port, 50, InetAddress.getByName("0.0.0.0"))
         running = true
 
         logger.info("DB Server started on port {} (max connections: {})", port, maxConnections)
