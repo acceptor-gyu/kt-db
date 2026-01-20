@@ -132,13 +132,18 @@ class TableService(
     }
 
     /**
-     * 테이블 조회 (Thread-safe)
+     * 테이블 조회 (Thread-safe, Disk-based for full table scan)
+     *
+     * Full table scan: 파일에서 직접 읽어서 최신 데이터 보장
+     * - tableFileManager가 있으면 디스크에서 읽기
+     * - 없으면 메모리 캐시에서 읽기 (fallback)
      *
      * @param tableName 테이블 이름
      * @return Table 객체 또는 null
      */
     fun select(tableName: String): Table? {
-        return tables[tableName]
+        // 디스크에서 최신 데이터 읽기 (full table scan)
+        return tableFileManager?.readTable(tableName) ?: tables[tableName]
     }
 
     /**
