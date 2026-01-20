@@ -6,24 +6,33 @@ Docker Compose를 사용하여 전체 시스템을 한 번에 실행할 수 있�
 
 Docker Compose는 다음 4개의 서비스를 실행합니다:
 
-| 서비스 | 포트 | 설명 |
-|--------|------|------|
-| **elasticsearch** | 9200, 9300 | Elasticsearch 서버 (EXPLAIN 기능용) |
-| **kibana** | 5601 | Kibana (Elasticsearch 모니터링) |
-| **db-server** | 9000 | DB 서버 (TCP 프로토콜) |
-| **api-server** | 8080 | REST API 서버 (HTTP) |
+| 서비스 | 호스트 포트 | 컨테이너 포트 | 설명 |
+|--------|------------|--------------|------|
+| **elasticsearch** | 9201, 9301 | 9200, 9300 | Elasticsearch 서버 (EXPLAIN 기능용) |
+| **kibana** | 5602 | 5601 | Kibana (Elasticsearch 모니터링) |
+| **db-server** | 9001 | 9000 | DB 서버 (TCP 프로토콜) |
+| **api-server** | 8081 | 8080 | REST API 서버 (HTTP) |
+
+**포트 충돌 방지**: 호스트 포트는 로컬 실행과 충돌하지 않도록 +1 설정됨
 
 ## 실행 방법
 
 ### 1. 전체 서비스 실행 (백그라운드)
 
+**BuildKit 활성화 (권장):**
+```bash
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+```
+
+**실행:**
 ```bash
 docker compose up -d --build
 ```
 
 **옵션 설명:**
 - `-d`: 백그라운드 실행 (detached mode)
-- `--build`: 이미지 빌드 (코드 변경 시 필수)
+- `--build`: 이미지 빌드 (변경된 서비스만 재빌드)
 
 **실행 순서:**
 1. Elasticsearch 시작 및 헬스체크 대기
@@ -31,9 +40,13 @@ docker compose up -d --build
 3. DB Server 시작 및 헬스체크 대기
 4. API Server 시작
 
-**예상 시간:**
-- 첫 실행: 3-5분 (이미지 다운로드 + 빌드)
-- 이후 실행: 30초-1분 (캐시 사용)
+**예상 시간 (빌드 최적화 적용):**
+- **첫 실행**: 3-5분 (이미지 다운로드 + 전체 빌드)
+- **db-server 소스만 수정**: 30초 ⚡ (90% 감소)
+- **api-server 소스만 수정**: 30초 ⚡ (90% 감소)
+- **의존성 변경 없이 재실행**: 10초 (컨테이너 시작만)
+
+💡 **최적화 팁**: 자세한 빌드 최적화 내용은 [DOCKER_BUILD_GUIDE.md](./DOCKER_BUILD_GUIDE.md)를 참조하세요.
 
 ### 2. 로그 확인
 
@@ -84,7 +97,7 @@ kibana      Up 3 minutes        healthy
 
 **API 서버 연결 확인:**
 ```bash
-curl http://localhost:8080/api/tables/ping
+curl http://localhost:8081/api/tables/ping
 ```
 
 **응답 예시:**
@@ -97,11 +110,11 @@ curl http://localhost:8080/api/tables/ping
 
 **Elasticsearch 확인:**
 ```bash
-curl http://localhost:9200/_cluster/health
+curl http://localhost:9201/_cluster/health
 ```
 
 **Kibana 접속:**
-브라우저에서 `http://localhost:5601` 접속
+브라우저에서 `http://localhost:5602` 접속
 
 ### 5. 서비스 중지
 
@@ -193,11 +206,14 @@ Error response from daemon: Ports are not available
 **해결:**
 포트가 이미 사용 중입니다. 실행 중인 프로세스 확인:
 ```bash
-# 포트 8080 사용 확인
-lsof -i :8080
+# 포트 8081 사용 확인 (API Server)
+lsof -i :8081
 
-# 포트 9000 사용 확인
-lsof -i :9000
+# 포트 9001 사용 확인 (DB Server)
+lsof -i :9001
+
+# 포트 9201 사용 확인 (Elasticsearch)
+lsof -i :9201
 
 # 기존 프로세스 종료
 kill -9 <PID>
@@ -210,10 +226,24 @@ kill -9 <PID>
 failed to solve: process "/bin/sh -c ./gradlew ..." did not complete successfully
 ```
 
-**해결:**
-캐시를 무시하고 재빌드:
+**해결 1: 캐시 초기화 (권장)**
 ```bash
+# BuildKit 캐시 정리
+docker builder prune -af
+
+# 재빌드
 docker compose build --no-cache
+docker compose up -d
+```
+
+**해결 2: BuildKit 활성화 확인**
+```bash
+# BuildKit이 비활성화되어 있으면 최적화가 작동하지 않음
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+
+# 재빌드
+docker compose build
 docker compose up -d
 ```
 
@@ -267,24 +297,24 @@ cd api-server
 
 ```bash
 # 1. CREATE TABLE
-curl -X POST http://localhost:8080/api/tables/create \
+curl -X POST http://localhost:8081/api/tables/create \
   -H "Content-Type: application/json" \
   -d '{
     "query": "CREATE TABLE users (id INT, name VARCHAR, age INT)"
   }'
 
 # 2. INSERT
-curl -X POST http://localhost:8080/api/tables/insert \
+curl -X POST http://localhost:8081/api/tables/insert \
   -H "Content-Type: application/json" \
   -d '{
     "query": "INSERT INTO users VALUES (id=\"1\", name=\"John\", age=\"30\")"
   }'
 
 # 3. SELECT
-curl -X GET 'http://localhost:8080/api/tables/select?query=SELECT%20*%20FROM%20users'
+curl -X GET 'http://localhost:8081/api/tables/select?query=SELECT%20*%20FROM%20users'
 
 # 4. EXPLAIN
-curl -X GET 'http://localhost:8080/api/tables/query-plan?query=EXPLAIN%20SELECT%20*%20FROM%20users'
+curl -X GET 'http://localhost:8081/api/tables/query-plan?query=EXPLAIN%20SELECT%20*%20FROM%20users'
 ```
 
 ### 데이터 확인 (컨테이너 내부)
@@ -304,13 +334,32 @@ exit
 
 ### 코드 변경 후 재실행
 
+**변경된 서비스만 자동 재빌드 (권장):**
 ```bash
-# 1. 특정 서비스만 재빌드 및 재시작
-docker compose up -d --build api-server
-
-# 2. 또는 전체 재빌드
+# 변경 사항을 감지하여 필요한 서비스만 재빌드
 docker compose up -d --build
 ```
+
+**특정 서비스만 재빌드:**
+```bash
+# db-server만 수정했을 때
+docker compose build db-server
+docker compose up -d db-server
+
+# api-server만 수정했을 때
+docker compose build api-server
+docker compose up -d api-server
+```
+
+**빌드 없이 재시작만 (코드 변경 없을 때):**
+```bash
+docker compose restart db-server
+```
+
+💡 **성능 팁**:
+- db-server만 수정 시 api-server는 재빌드되지 않습니다 (레이어 캐싱)
+- 소스 코드만 변경 시 의존성 다운로드는 캐시됩니다 (2분 절약)
+- 자세한 내용: [DOCKER_BUILD_GUIDE.md](./DOCKER_BUILD_GUIDE.md)
 
 ### 로컬 개발과 Docker 병행
 
@@ -380,7 +429,7 @@ docker compose build --no-cache api-server
 # 사용하지 않는 리소스 정리
 docker system prune -a
 
-# 실행 중인 컨테이너에서 명령 실행
+# 실행 중인 컨테이너에서 명령 실행 (컨테이너 내부 포트 사용)
 docker compose exec api-server curl localhost:8080/api/tables/ping
 
 # 이미지 크기 확인
@@ -401,7 +450,7 @@ docker compose up -d --build
 **상태 확인:**
 ```bash
 docker compose ps
-curl http://localhost:8080/api/tables/ping
+curl http://localhost:8081/api/tables/ping
 ```
 
 **테스트:**

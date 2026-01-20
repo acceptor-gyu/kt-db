@@ -1,8 +1,62 @@
 # kt-db
 
-Kotlin으로 구현하는 In-Memory Database
+Kotlin으로 구현하는 관계형 데이터베이스
 
-데이터베이스를 처음부터 구현하면서 Kotlin과 네트워크 프로그래밍, 동시성 제어를 학습하는 프로젝트입니다.
+데이터베이스를 처음부터 구현하면서 Kotlin과 네트워크 프로그래밍, 동시성 제어, 파일 I/O를 학습하는 프로젝트입니다.
+
+## ✨ 주요 기능
+
+- **📦 파일 기반 영속성**: 바이너리 형식으로 테이블 데이터를 디스크에 저장 (서버 재시작 후 복원)
+- **🔍 EXPLAIN 쿼리 분석**: Elasticsearch 기반 쿼리 실행 계획 생성 및 최적화
+- **🔒 Thread-Safe 설계**: ConcurrentHashMap과 atomic operation으로 동시성 보장
+- **🚀 Docker 빌드 최적화**: 레이어 캐싱으로 재빌드 시간 90% 단축 (5분 → 30초)
+- **🌐 멀티 클라이언트 지원**: TCP 프로토콜로 동시 다중 연결 처리
+- **📊 쿼리 로깅**: Elasticsearch에 쿼리 실행 이력 저장 및 Kibana로 시각화
+
+## 📋 지원 기능
+
+### SQL 명령어
+
+| 명령어 | 형식 | 예시 |
+|--------|------|------|
+| **CREATE TABLE** | `CREATE TABLE <name> (col type, ...)` | `CREATE TABLE users (id INT, name VARCHAR, age INT)` |
+| **INSERT** | `INSERT INTO <table> VALUES (col="val", ...)` | `INSERT INTO users VALUES (id="1", name="John", age="30")` |
+| **SELECT** | `SELECT * FROM <table>` | `SELECT * FROM users` |
+| **DROP TABLE** | `DROP TABLE <name>` | `DROP TABLE users` |
+| **EXPLAIN** | `EXPLAIN SELECT * FROM <table>` | `EXPLAIN SELECT * FROM users WHERE name='Alice'` |
+| **PING** | `PING` | `PING` (연결 확인) |
+
+### 데이터 타입
+
+| 타입 | 크기 | 범위/설명 | 예시 |
+|------|------|-----------|------|
+| **INT** | 4 bytes | 정수형 (-2,147,483,648 ~ 2,147,483,647) | `42`, `-100` |
+| **VARCHAR** | 가변 | 문자열 (최대 65,535 bytes) | `"Hello"`, `"김철수"` |
+| **BOOLEAN** | 1 byte | true/false | `true`, `false` |
+| **TIMESTAMP** | 8 bytes | 날짜/시간 (ISO 8601 형식) | `"2024-01-15T10:30:00Z"` |
+
+### 바이너리 파일 인코딩
+
+- **INT**: 4 bytes, Big Endian
+- **VARCHAR**: `[2-byte length][UTF-8 bytes]`
+- **BOOLEAN**: 1 byte (`0x00` = false, `0x01` = true)
+- **TIMESTAMP**: 8 bytes, Unix timestamp milliseconds
+
+### 제한사항
+
+**현재 미지원 기능:**
+- ❌ WHERE 절 (조건부 SELECT)
+- ❌ UPDATE 문
+- ❌ DELETE 문 (레코드 삭제)
+- ❌ JOIN 연산
+- ❌ 인덱스 (EXPLAIN 분석용 메타데이터만 존재)
+- ❌ 트랜잭션 (COMMIT/ROLLBACK)
+- ❌ NULL 값
+
+**제약 조건:**
+- SELECT는 전체 테이블 스캔만 지원 (`SELECT * FROM table`)
+- 테이블당 하나의 파일로 저장 (파티셔닝 미지원)
+- 동시 쓰기는 thread-safe하지만 최적화는 제한적
 
 ## 프로젝트 구조
 
@@ -76,11 +130,16 @@ Kotlin으로 구현하는 In-Memory Database
   - 연결 종료 시 리소스 정리 및 ConnectionManager에서 unregister
 
 #### 4. TableService
-- **역할**: In-memory 데이터 저장소
+- **역할**: 테이블 데이터 관리 (In-memory 캐시 + 파일 기반 영속성)
 - **인스턴스**: 1개 (모든 연결이 공유)
+- **저장 방식**:
+  - In-memory: `ConcurrentHashMap`으로 빠른 쓰기/읽기
+  - Disk: `./data/*.dat` 바이너리 파일로 영구 저장
+  - SELECT: 디스크에서 직접 읽기 (full table scan)
 - **Thread-Safety**:
   - `ConcurrentHashMap` 사용
   - `compute()`, `putIfAbsent()` 등 atomic operation
+  - 파일 쓰기는 atomic write (temp file → sync → rename)
   - 여러 ConnectionHandler의 동시 접근 안전
 
 ### 디스크 기반 영속성 (Disk I/O)
@@ -697,15 +756,19 @@ services:
   elasticsearch:
     - DML/DDL 쿼리 로그 저장
     - 검색 및 집계 기능
-    - Port: 9200 (HTTP), 9300 (Transport)
+    - 호스트 Port: 9201 (HTTP), 9301 (Transport)
+    - 컨테이너 Port: 9200, 9300
 
   kibana:
     - Elasticsearch 데이터 시각화
     - 대시보드 및 통계
-    - Port: 5601 (Web UI)
+    - 호스트 Port: 5602 (Web UI)
+    - 컨테이너 Port: 5601
 
   db-server:
-    - TCP 서버 (Port 9000)
+    - TCP 서버
+    - 호스트 Port: 9001
+    - 컨테이너 Port: 9000
     - 쿼리 실행 및 로깅
     - Elasticsearch 연동
 ```
@@ -726,8 +789,8 @@ docker compose ps
 cd db-server
 ./gradlew runQueryLogExample
 
-# 5. Kibana에서 로그 확인
-# 브라우저에서 http://localhost:5601 접속
+# 5. Kibana에서 로그 확인 (Docker 환경)
+# 브라우저에서 http://localhost:5602 접속
 ```
 
 자세한 Elasticsearch 설정 및 사용법은 [ELASTICSEARCH.md](./ELASTICSEARCH.md)를 참조하세요.
@@ -747,15 +810,20 @@ cd db-server
 
 전체 시스템을 한 번에 실행합니다 (Elasticsearch + Kibana + DB Server + API Server).
 
+**빠른 시작:**
 ```bash
-# 전체 서비스 실행
+# BuildKit 활성화 (빌드 최적화)
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+
+# 전체 서비스 실행 (변경된 서비스만 재빌드)
 docker compose up -d --build
 
 # 서비스 상태 확인
 docker compose ps
 
 # API 테스트
-curl http://localhost:8080/api/tables/ping
+curl http://localhost:8081/api/tables/ping
 
 # 로그 확인
 docker compose logs -f api-server
@@ -779,10 +847,17 @@ docker compose down
 **동시 실행 가능:** 로컬과 Docker가 서로 다른 포트를 사용하므로 같은 PC에서 동시에 실행할 수 있습니다. 자세한 내용은 [PROFILES.md](./PROFILES.md)를 참조하세요.
 
 **데이터 영속성:**
-- 테이블 데이터: `db_db-server-data` 볼륨에 저장
+- 테이블 데이터: `db_db-server-data` 볼륨에 `*.dat` 파일 형식으로 저장
 - Elasticsearch 데이터: `db_elasticsearch-data` 볼륨에 저장
 
-자세한 Docker 사용법은 [DOCKER_GUIDE.md](./DOCKER_GUIDE.md)를 참조하세요.
+**빌드 최적화:**
+- db-server만 수정 시 30초 만에 재빌드 (90% 감소) ⚡
+- api-server만 수정 시 30초 만에 재빌드 (90% 감소) ⚡
+- 레이어 캐싱 및 BuildKit 캐시 마운트 활용
+
+자세한 사용법:
+- 일반 사용: [DOCKER_GUIDE.md](./DOCKER_GUIDE.md)
+- 빌드 최적화: [DOCKER_BUILD_GUIDE.md](./DOCKER_BUILD_GUIDE.md)
 
 ### 방법 2: 로컬 실행 (Gradle)
 
@@ -972,16 +1047,14 @@ object ProtocolCodec {
 
 ### 지원하는 SQL 명령
 
-서버는 다음 SQL 명령을 파싱하고 처리합니다:
+서버는 다음 SQL 명령을 파싱하고 처리합니다 (자세한 내용은 [📋 지원 기능](#-지원-기능) 섹션 참조):
 
-| 명령 | 형식 | 예시 |
-|------|------|------|
-| **CREATE TABLE** | `CREATE TABLE <name> (col type, ...)` | `CREATE TABLE users (id INT, name VARCHAR)` |
-| **INSERT** | `INSERT INTO <table> VALUES (col="val", ...)` | `INSERT INTO users VALUES (id="1", name="John")` |
-| **SELECT** | `SELECT * FROM <table> [WHERE ...]` | `SELECT * FROM users WHERE id="1"` |
-| **DROP TABLE** | `DROP TABLE <name>` | `DROP TABLE users` |
-| **EXPLAIN** | `EXPLAIN <query>` | `EXPLAIN SELECT * FROM users` |
-| **PING** | `PING` | `PING` |
+- **CREATE TABLE**: 테이블 생성
+- **INSERT**: 레코드 삽입
+- **SELECT**: 전체 테이블 스캔 (WHERE 절 미지원)
+- **DROP TABLE**: 테이블 삭제
+- **EXPLAIN**: 쿼리 실행 계획 분석
+- **PING**: 연결 확인
 
 ### ConnectionHandler SQL 파싱
 
@@ -1038,3 +1111,22 @@ Server: TCP → UTF-8 → SQL → 파싱 → 실행
 - `db-server/ConnectionHandler.kt` - SQL 문자열 직접 처리
 - `api-server/DbClient.kt` - SQL 문자열 직접 전송
 - `api-server/TableController.kt` - DbRequest 생성 제거
+
+## 📚 문서 목록
+
+프로젝트의 상세 가이드 문서:
+
+| 문서 | 설명 |
+|------|------|
+| [README.md](./README.md) | 프로젝트 개요, 아키텍처, API 사용법 |
+| [DOCKER_GUIDE.md](./DOCKER_GUIDE.md) | Docker Compose 사용 가이드 (실행, 로그, 트러블슈팅) |
+| [DOCKER_BUILD_GUIDE.md](./DOCKER_BUILD_GUIDE.md) | Docker 빌드 최적화 가이드 (레이어 캐싱, BuildKit) |
+| [EXPLAIN_GUIDE.md](./EXPLAIN_GUIDE.md) | EXPLAIN 쿼리 분석 기능 상세 가이드 |
+| [PROFILES.md](./PROFILES.md) | Spring Profile 설정 및 환경별 구성 |
+
+**핵심 개념:**
+- **디스크 I/O**: README.md > "디스크 기반 영속성" 섹션
+- **Thread-Safety**: README.md > "Thread-Safety 보장" 섹션
+- **EXPLAIN**: EXPLAIN_GUIDE.md
+- **Docker 최적화**: DOCKER_BUILD_GUIDE.md
+
