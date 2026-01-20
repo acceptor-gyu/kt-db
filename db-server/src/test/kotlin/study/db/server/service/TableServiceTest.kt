@@ -137,7 +137,7 @@ class TableServiceTest {
             // Then: 데이터 확인
             val table = tableService.select("users")
             assertNotNull(table)
-            assertEquals(values, table?.value)
+            assertEquals(values, table?.rows?.last())
         }
 
         @Test
@@ -153,21 +153,22 @@ class TableServiceTest {
         }
 
         @Test
-        @DisplayName("여러 번 삽입하면 값이 병합됨")
-        fun `multiple inserts merge values`() {
+        @DisplayName("여러 번 삽입하면 모든 행이 저장됨")
+        fun `multiple inserts store all rows`() {
             // Given: 초기 데이터
             val initialValues = mapOf("id" to "1", "name" to "John")
             tableService.insert("users", initialValues)
 
-            // When: 추가 데이터 삽입 (같은 키를 가진 값)
+            // When: 추가 데이터 삽입
             val additionalValues = mapOf("id" to "2", "name" to "Jane")
             tableService.insert("users", additionalValues)
 
-            // Then: 맵 병합으로 같은 키는 덮어써짐
+            // Then: 두 행 모두 저장됨
             val table = tableService.select("users")
             assertNotNull(table)
-            assertEquals("2", table?.value?.get("id"))
-            assertEquals("Jane", table?.value?.get("name"))
+            assertEquals(2, table?.rows?.size)
+            assertEquals("John", table?.rows?.get(0)?.get("name"))
+            assertEquals("Jane", table?.rows?.get(1)?.get("name"))
         }
 
         @Test
@@ -179,9 +180,10 @@ class TableServiceTest {
             // When: 빈 값 삽입
             assertDoesNotThrow { tableService.insert("users", emptyValues) }
 
-            // Then: 데이터는 없음
+            // Then: 빈 맵이 한 행으로 저장됨
             val table = tableService.select("users")
-            assertTrue(table?.value?.isEmpty() ?: false)
+            assertEquals(1, table?.rows?.size)
+            assertTrue(table?.rows?.first()?.isEmpty() ?: false)
         }
     }
 
@@ -228,7 +230,7 @@ class TableServiceTest {
 
             // Then: 데이터 포함하여 반환
             assertNotNull(table)
-            assertEquals(values, table?.value)
+            assertEquals(values, table?.rows?.last())
         }
     }
 
@@ -379,7 +381,7 @@ class TableServiceTest {
             val table = tableService.select("users")
             assertNotNull(table)
             assertEquals("users", table?.tableName)
-            assertEquals(userData, table?.value)
+            assertEquals(userData, table?.rows?.last())
 
             // Update (재삽입)
             val updatedData = mapOf("id" to "1", "name" to "John Doe")
@@ -414,9 +416,9 @@ class TableServiceTest {
             assertNotNull(posts)
             assertNotNull(comments)
 
-            assertEquals("John", users?.value?.get("name"))
-            assertEquals("First Post", posts?.value?.get("title"))
-            assertEquals("Great!", comments?.value?.get("content"))
+            assertEquals("John", users?.rows?.last()?.get("name"))
+            assertEquals("First Post", posts?.rows?.last()?.get("title"))
+            assertEquals("Great!", comments?.rows?.last()?.get("content"))
         }
     }
 

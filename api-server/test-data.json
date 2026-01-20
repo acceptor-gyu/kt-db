@@ -1,0 +1,267 @@
+{
+  "테스트_시나리오": {
+    "설명": "API 테스트를 위한 샘플 데이터",
+    "총_테이블_수": 5,
+    "총_레코드_수": 19
+  },
+  "시나리오_1_사용자_테이블": {
+    "CREATE_TABLE": {
+      "endpoint": "POST /api/tables/create",
+      "body": {
+        "query": "CREATE TABLE users (id INT, name VARCHAR, email VARCHAR, age INT, active BOOLEAN)"
+      }
+    },
+    "INSERT_데이터": [
+      {
+        "설명": "활성 사용자 - John",
+        "endpoint": "POST /api/tables/insert",
+        "body": {
+          "query": "INSERT INTO users VALUES (id=\"1\", name=\"John Doe\", email=\"john@example.com\", age=\"30\", active=\"true\")"
+        }
+      },
+      {
+        "설명": "활성 사용자 - Jane",
+        "endpoint": "POST /api/tables/insert",
+        "body": {
+          "query": "INSERT INTO users VALUES (id=\"2\", name=\"Jane Smith\", email=\"jane@example.com\", age=\"25\", active=\"true\")"
+        }
+      },
+      {
+        "설명": "비활성 사용자 - Bob",
+        "endpoint": "POST /api/tables/insert",
+        "body": {
+          "query": "INSERT INTO users VALUES (id=\"3\", name=\"Bob Wilson\", email=\"bob@example.com\", age=\"35\", active=\"false\")"
+        }
+      },
+      {
+        "설명": "활성 사용자 - Alice",
+        "endpoint": "POST /api/tables/insert",
+        "body": {
+          "query": "INSERT INTO users VALUES (id=\"4\", name=\"Alice Brown\", email=\"alice@example.com\", age=\"28\", active=\"true\")"
+        }
+      }
+    ],
+    "SELECT": {
+      "endpoint": "GET /api/tables/select",
+      "query_parameter": "SELECT * FROM users"
+    },
+    "EXPLAIN": {
+      "endpoint": "GET /api/tables/query-plan",
+      "query_parameter": "EXPLAIN SELECT * FROM users"
+    }
+  },
+  "시나리오_2_상품_테이블": {
+    "CREATE_TABLE": {
+      "endpoint": "POST /api/tables/create",
+      "body": {
+        "query": "CREATE TABLE products (id INT, name VARCHAR, price INT, stock INT, available BOOLEAN)"
+      }
+    },
+    "INSERT_데이터": [
+      {
+        "설명": "재고 있음 - Laptop",
+        "endpoint": "POST /api/tables/insert",
+        "body": {
+          "query": "INSERT INTO products VALUES (id=\"101\", name=\"Laptop\", price=\"1200\", stock=\"15\", available=\"true\")"
+        }
+      },
+      {
+        "설명": "재고 많음 - Mouse",
+        "endpoint": "POST /api/tables/insert",
+        "body": {
+          "query": "INSERT INTO products VALUES (id=\"102\", name=\"Wireless Mouse\", price=\"25\", stock=\"50\", available=\"true\")"
+        }
+      },
+      {
+        "설명": "재고 없음 - Keyboard",
+        "endpoint": "POST /api/tables/insert",
+        "body": {
+          "query": "INSERT INTO products VALUES (id=\"103\", name=\"Mechanical Keyboard\", price=\"80\", stock=\"0\", available=\"false\")"
+        }
+      },
+      {
+        "설명": "재고 적음 - Monitor",
+        "endpoint": "POST /api/tables/insert",
+        "body": {
+          "query": "INSERT INTO products VALUES (id=\"104\", name=\"4K Monitor\", price=\"350\", stock=\"8\", available=\"true\")"
+        }
+      },
+      {
+        "설명": "재고 있음 - Headphones",
+        "endpoint": "POST /api/tables/insert",
+        "body": {
+          "query": "INSERT INTO products VALUES (id=\"105\", name=\"Bluetooth Headphones\", price=\"120\", stock=\"20\", available=\"true\")"
+        }
+      }
+    ],
+    "SELECT": {
+      "endpoint": "GET /api/tables/select",
+      "query_parameter": "SELECT * FROM products"
+    },
+    "EXPLAIN": {
+      "endpoint": "GET /api/tables/query-plan",
+      "query_parameter": "EXPLAIN SELECT * FROM products"
+    }
+  },
+  "시나리오_3_주문_테이블": {
+    "CREATE_TABLE": {
+      "endpoint": "POST /api/tables/create",
+      "body": {
+        "query": "CREATE TABLE orders (order_id INT, user_id INT, product_id INT, quantity INT, total_price INT)"
+      }
+    },
+    "INSERT_데이터": [
+      {
+        "설명": "John의 Laptop 주문",
+        "endpoint": "POST /api/tables/insert",
+        "body": {
+          "query": "INSERT INTO orders VALUES (order_id=\"1001\", user_id=\"1\", product_id=\"101\", quantity=\"1\", total_price=\"1200\")"
+        }
+      },
+      {
+        "설명": "Jane의 Mouse 주문 (2개)",
+        "endpoint": "POST /api/tables/insert",
+        "body": {
+          "query": "INSERT INTO orders VALUES (order_id=\"1002\", user_id=\"2\", product_id=\"102\", quantity=\"2\", total_price=\"50\")"
+        }
+      },
+      {
+        "설명": "John의 Monitor 주문",
+        "endpoint": "POST /api/tables/insert",
+        "body": {
+          "query": "INSERT INTO orders VALUES (order_id=\"1003\", user_id=\"1\", product_id=\"104\", quantity=\"1\", total_price=\"350\")"
+        }
+      }
+    ],
+    "SELECT": {
+      "endpoint": "GET /api/tables/select",
+      "query_parameter": "SELECT * FROM orders"
+    },
+    "EXPLAIN": {
+      "endpoint": "GET /api/tables/query-plan",
+      "query_parameter": "EXPLAIN SELECT * FROM orders"
+    }
+  },
+  "시나리오_4_로그_테이블": {
+    "CREATE_TABLE": {
+      "endpoint": "POST /api/tables/create",
+      "body": {
+        "query": "CREATE TABLE logs (log_id INT, user_id INT, action VARCHAR, created_at TIMESTAMP)"
+      }
+    },
+    "INSERT_데이터": [
+      {
+        "설명": "John 로그인",
+        "endpoint": "POST /api/tables/insert",
+        "body": {
+          "query": "INSERT INTO logs VALUES (log_id=\"1\", user_id=\"1\", action=\"login\", created_at=\"2024-01-15T10:30:00Z\")"
+        }
+      },
+      {
+        "설명": "John 상품 조회",
+        "endpoint": "POST /api/tables/insert",
+        "body": {
+          "query": "INSERT INTO logs VALUES (log_id=\"2\", user_id=\"1\", action=\"view_product\", created_at=\"2024-01-15T10:35:00Z\")"
+        }
+      },
+      {
+        "설명": "Jane 로그인",
+        "endpoint": "POST /api/tables/insert",
+        "body": {
+          "query": "INSERT INTO logs VALUES (log_id=\"3\", user_id=\"2\", action=\"login\", created_at=\"2024-01-15T11:00:00Z\")"
+        }
+      },
+      {
+        "설명": "John 구매",
+        "endpoint": "POST /api/tables/insert",
+        "body": {
+          "query": "INSERT INTO logs VALUES (log_id=\"4\", user_id=\"1\", action=\"purchase\", created_at=\"2024-01-15T10:40:00Z\")"
+        }
+      }
+    ],
+    "SELECT": {
+      "endpoint": "GET /api/tables/select",
+      "query_parameter": "SELECT * FROM logs"
+    },
+    "EXPLAIN": {
+      "endpoint": "GET /api/tables/query-plan",
+      "query_parameter": "EXPLAIN SELECT * FROM logs"
+    }
+  },
+  "시나리오_5_직원_테이블": {
+    "CREATE_TABLE": {
+      "endpoint": "POST /api/tables/create",
+      "body": {
+        "query": "CREATE TABLE employees (emp_id INT, name VARCHAR, department VARCHAR, salary INT, hired_at TIMESTAMP)"
+      }
+    },
+    "INSERT_데이터": [
+      {
+        "설명": "Engineering 부서 - David",
+        "endpoint": "POST /api/tables/insert",
+        "body": {
+          "query": "INSERT INTO employees VALUES (emp_id=\"1001\", name=\"David Lee\", department=\"Engineering\", salary=\"90000\", hired_at=\"2022-03-15T09:00:00Z\")"
+        }
+      },
+      {
+        "설명": "Marketing 부서 - Sarah",
+        "endpoint": "POST /api/tables/insert",
+        "body": {
+          "query": "INSERT INTO employees VALUES (emp_id=\"1002\", name=\"Sarah Kim\", department=\"Marketing\", salary=\"75000\", hired_at=\"2021-06-01T09:00:00Z\")"
+        }
+      },
+      {
+        "설명": "Engineering 부서 - Michael",
+        "endpoint": "POST /api/tables/insert",
+        "body": {
+          "query": "INSERT INTO employees VALUES (emp_id=\"1003\", name=\"Michael Park\", department=\"Engineering\", salary=\"95000\", hired_at=\"2020-01-20T09:00:00Z\")"
+        }
+      }
+    ],
+    "SELECT": {
+      "endpoint": "GET /api/tables/select",
+      "query_parameter": "SELECT * FROM employees"
+    },
+    "EXPLAIN": {
+      "endpoint": "GET /api/tables/query-plan",
+      "query_parameter": "EXPLAIN SELECT * FROM employees"
+    }
+  },
+  "추가_EXPLAIN_쿼리_예제": [
+    {
+      "설명": "활성 사용자만 조회",
+      "endpoint": "GET /api/tables/query-plan",
+      "query_parameter": "EXPLAIN SELECT * FROM users WHERE active=\"true\""
+    },
+    {
+      "설명": "가격이 100 이상인 상품 조회",
+      "endpoint": "GET /api/tables/query-plan",
+      "query_parameter": "EXPLAIN SELECT * FROM products WHERE price > 100"
+    },
+    {
+      "설명": "특정 사용자의 주문 조회",
+      "endpoint": "GET /api/tables/query-plan",
+      "query_parameter": "EXPLAIN SELECT * FROM orders WHERE user_id=\"1\""
+    },
+    {
+      "설명": "로그인 액션만 조회",
+      "endpoint": "GET /api/tables/query-plan",
+      "query_parameter": "EXPLAIN SELECT * FROM logs WHERE action=\"login\""
+    },
+    {
+      "설명": "Engineering 부서 직원 조회",
+      "endpoint": "GET /api/tables/query-plan",
+      "query_parameter": "EXPLAIN SELECT * FROM employees WHERE department=\"Engineering\""
+    }
+  ],
+  "빠른_테스트_명령어": {
+    "bash_스크립트_실행": "chmod +x test-api-requests.sh && ./test-api-requests.sh",
+    "개별_curl_테스트": {
+      "CREATE": "curl -X POST http://localhost:8080/api/tables/create -H 'Content-Type: application/json' -d '{\"query\": \"CREATE TABLE test (id INT)\"}'",
+      "INSERT": "curl -X POST http://localhost:8080/api/tables/insert -H 'Content-Type: application/json' -d '{\"query\": \"INSERT INTO test VALUES (id=\\\"1\\\")\"}'",
+      "SELECT": "curl -X GET 'http://localhost:8080/api/tables/select?query=SELECT%20*%20FROM%20test'",
+      "EXPLAIN": "curl -X GET 'http://localhost:8080/api/tables/query-plan?query=EXPLAIN%20SELECT%20*%20FROM%20test'",
+      "DROP": "curl -X DELETE 'http://localhost:8080/api/tables/drop?query=DROP%20TABLE%20test'"
+    }
+  }
+}

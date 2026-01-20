@@ -1,9 +1,11 @@
 package study.db.server.service
 
+import org.slf4j.LoggerFactory
 import study.db.common.Table
 import study.db.server.exception.ColumnNotFoundException
 import study.db.server.exception.TypeMismatchException
 import study.db.server.exception.UnsupportedTypeException
+import study.db.server.storage.TableFileManager
 import study.db.server.validation.TypeValidator
 import java.util.concurrent.ConcurrentHashMap
 
@@ -13,8 +15,14 @@ import java.util.concurrent.ConcurrentHashMap
  * 여러 ConnectionHandler가 동시에 접근하므로 Thread-safe하게 구현됨:
  * - ConcurrentHashMap 사용으로 기본 thread-safety 보장
  * - insert, createTable 등의 복합 연산은 atomic operation으로 처리
+ *
+ * @param tableFileManager 파일 기반 persistence 관리자 (optional)
  */
-class TableService {
+class TableService(
+    private val tableFileManager: TableFileManager? = null
+) {
+    private val logger = LoggerFactory.getLogger(TableService::class.java)
+
     /**
      * 테이블 저장소 (Thread-safe)
      * - ConcurrentHashMap: 동시 읽기/쓰기 안전
@@ -22,6 +30,23 @@ class TableService {
      * - Value: Table 객체 (immutable copy 사용)
      */
     private val tables = ConcurrentHashMap<String, Table>()
+
+    init {
+        // 파일에서 테이블 로드
+        tableFileManager?.let { manager ->
+            manager.listAllTables().forEach { tableName ->
+                try {
+                    manager.readTable(tableName)?.let { table ->
+                        tables[table.tableName] = table
+                        logger.info("Loaded table '${table.tableName}' with ${table.rows.size} rows from disk")
+                    }
+                } catch (e: Exception) {
+                    logger.error("Failed to load table '$tableName' from disk", e)
+                }
+            }
+            logger.info("Total ${tables.size} tables loaded from disk")
+        }
+    }
 
     /**
      * 테이블 생성 (Thread-safe)
@@ -34,12 +59,15 @@ class TableService {
         val table = Table(
             tableName = tableName,
             dataType = columns,
-            value = emptyMap()
+            rows = emptyList()
         )
 
         // putIfAbsent: 이미 존재하면 기존 테이블 유지 (atomic operation)
         // 동시에 같은 이름의 테이블을 생성하려는 경우 방지
         tables.putIfAbsent(tableName, table)
+
+        // 파일로 저장
+        tableFileManager?.writeTable(table)
 
         return buildCreateTableQuery(table)
     }
@@ -76,9 +104,12 @@ class TableService {
         // 3. 데이터 삽입 (atomic operation)
         // compute: key에 대한 값을 atomic하게 계산/업데이트
         // 여러 스레드가 동시에 같은 테이블에 insert해도 안전
-        tables.compute(tableName) { _, table ->
-            table?.copy(value = table.value + values)
+        val updated = tables.compute(tableName) { _, table ->
+            table?.copy(rows = table.rows + values)
         }
+
+        // 파일로 저장
+        updated?.let { tableFileManager?.writeTable(it) }
     }
 
     /**
@@ -101,13 +132,18 @@ class TableService {
     }
 
     /**
-     * 테이블 조회 (Thread-safe)
+     * 테이블 조회 (Thread-safe, Disk-based for full table scan)
+     *
+     * Full table scan: 파일에서 직접 읽어서 최신 데이터 보장
+     * - tableFileManager가 있으면 디스크에서 읽기
+     * - 없으면 메모리 캐시에서 읽기 (fallback)
      *
      * @param tableName 테이블 이름
      * @return Table 객체 또는 null
      */
     fun select(tableName: String): Table? {
-        return tables[tableName]
+        // 디스크에서 최신 데이터 읽기 (full table scan)
+        return tableFileManager?.readTable(tableName) ?: tables[tableName]
     }
 
     /**
@@ -126,7 +162,11 @@ class TableService {
      * @return 성공 여부 (테이블이 존재했으면 true)
      */
     fun dropTable(tableName: String): Boolean {
-        return tables.remove(tableName) != null
+        val removed = tables.remove(tableName) != null
+        if (removed) {
+            tableFileManager?.deleteTable(tableName)
+        }
+        return removed
     }
 
     /**

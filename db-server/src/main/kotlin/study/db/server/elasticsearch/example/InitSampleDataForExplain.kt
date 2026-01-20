@@ -33,20 +33,25 @@ class InitSampleDataForExplainApp {
         tableStatisticsRepository: TableStatisticsRepository
     ): CommandLineRunner {
         return CommandLineRunner {
-            logger.info("=".repeat(80))
-            logger.info("Initializing sample data for EXPLAIN testing...")
-            logger.info("=".repeat(80))
-            logger.info("")
+            try {
+                logger.info("=".repeat(80))
+                logger.info("Initializing sample data for EXPLAIN testing...")
+                logger.info("=".repeat(80))
+                logger.info("")
 
-            initUsersTable(tableMetadataService, indexMetadataService, tableStatisticsService, tableStatisticsRepository)
-            initOrdersTable(tableMetadataService, indexMetadataService, tableStatisticsService, tableStatisticsRepository)
-            initProductsTable(tableMetadataService, indexMetadataService, tableStatisticsService, tableStatisticsRepository)
+                initUsersTable(tableMetadataService, indexMetadataService, tableStatisticsService, tableStatisticsRepository)
+                initOrdersTable(tableMetadataService, indexMetadataService, tableStatisticsService, tableStatisticsRepository)
+                initProductsTable(tableMetadataService, indexMetadataService, tableStatisticsService, tableStatisticsRepository)
 
-            logger.info("")
-            logger.info("=".repeat(80))
-            logger.info("Sample data initialization completed!")
-            logger.info("=".repeat(80))
-            printTestScenarios()
+                logger.info("")
+                logger.info("=".repeat(80))
+                logger.info("Sample data initialization completed!")
+                logger.info("=".repeat(80))
+                printTestScenarios()
+            } catch (e: Exception) {
+                logger.warn("Sample data initialization failed (data may already exist): ${e.message}")
+                logger.info("Skipping sample data initialization and continuing with server startup")
+            }
         }
     }
 
@@ -67,9 +72,13 @@ class InitSampleDataForExplainApp {
             ColumnInfo("city", "VARCHAR")
         )
 
-        tableMetadataService.createTable(tableName, columns)
-        tableMetadataService.updateRowCount(tableName, 100_000)
-        logger.info("✓ Created table '$tableName' with 100,000 rows")
+        try {
+            tableMetadataService.createTable(tableName, columns)
+            tableMetadataService.updateRowCount(tableName, 100_000)
+            logger.info("✓ Created table '$tableName' with 100,000 rows")
+        } catch (e: IllegalStateException) {
+            logger.info("✓ Table '$tableName' already exists, skipping creation")
+        }
 
         indexMetadataService.createIndex("idx_email", tableName, listOf("email"), unique = false)
         logger.info("✓ Created index 'idx_email' on (email)")
@@ -116,9 +125,13 @@ class InitSampleDataForExplainApp {
             ColumnInfo("created_at", "TIMESTAMP")
         )
 
-        tableMetadataService.createTable(tableName, columns)
-        tableMetadataService.updateRowCount(tableName, 500_000)
-        logger.info("✓ Created table '$tableName' with 500,000 rows")
+        try {
+            tableMetadataService.createTable(tableName, columns)
+            tableMetadataService.updateRowCount(tableName, 500_000)
+            logger.info("✓ Created table '$tableName' with 500,000 rows")
+        } catch (e: IllegalStateException) {
+            logger.info("✓ Table '$tableName' already exists, skipping creation")
+        }
 
         indexMetadataService.createIndex("idx_user_id", tableName, listOf("user_id"), unique = false)
         logger.info("✓ Created index 'idx_user_id' on (user_id)")
@@ -163,9 +176,13 @@ class InitSampleDataForExplainApp {
             ColumnInfo("stock", "INT")
         )
 
-        tableMetadataService.createTable(tableName, columns)
-        tableMetadataService.updateRowCount(tableName, 10_000)
-        logger.info("✓ Created table '$tableName' with 10,000 rows")
+        try {
+            tableMetadataService.createTable(tableName, columns)
+            tableMetadataService.updateRowCount(tableName, 10_000)
+            logger.info("✓ Created table '$tableName' with 10,000 rows")
+        } catch (e: IllegalStateException) {
+            logger.info("✓ Table '$tableName' already exists, skipping creation")
+        }
 
         indexMetadataService.createIndex("idx_category", tableName, listOf("category"), unique = false)
         logger.info("✓ Created index 'idx_category' on (category)")

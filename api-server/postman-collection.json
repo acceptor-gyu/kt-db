@@ -1,0 +1,882 @@
+{
+  "info": {
+    "name": "DB API 테스트 컬렉션",
+    "description": "CREATE, INSERT, SELECT, EXPLAIN 테스트를 위한 Postman 컬렉션",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "0. Ping - DB 서버 연결 확인",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/api/tables/ping",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "tables", "ping"]
+        }
+      }
+    },
+    {
+      "name": "1. Users",
+      "item": [
+        {
+          "name": "1-1. CREATE TABLE users",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"CREATE TABLE users (id INT, name VARCHAR, email VARCHAR, age INT, active BOOLEAN)\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/tables/create",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "create"]
+            }
+          }
+        },
+        {
+          "name": "1-2. INSERT - John",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"INSERT INTO users VALUES (id=\\\"1\\\", name=\\\"John Doe\\\", email=\\\"john@example.com\\\", age=\\\"30\\\", active=\\\"true\\\")\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/tables/insert",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "insert"]
+            }
+          }
+        },
+        {
+          "name": "1-3. INSERT - Jane",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"INSERT INTO users VALUES (id=\\\"2\\\", name=\\\"Jane Smith\\\", email=\\\"jane@example.com\\\", age=\\\"25\\\", active=\\\"true\\\")\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/tables/insert",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "insert"]
+            }
+          }
+        },
+        {
+          "name": "1-4. INSERT - Bob (inactive)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"INSERT INTO users VALUES (id=\\\"3\\\", name=\\\"Bob Wilson\\\", email=\\\"bob@example.com\\\", age=\\\"35\\\", active=\\\"false\\\")\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/tables/insert",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "insert"]
+            }
+          }
+        },
+        {
+          "name": "1-5. INSERT - Alice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"INSERT INTO users VALUES (id=\\\"4\\\", name=\\\"Alice Brown\\\", email=\\\"alice@example.com\\\", age=\\\"28\\\", active=\\\"true\\\")\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/tables/insert",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "insert"]
+            }
+          }
+        },
+        {
+          "name": "1-6. SELECT * FROM users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/api/tables/select?query=SELECT * FROM users",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "select"],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "SELECT * FROM users"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "1-7. EXPLAIN SELECT * FROM users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/api/tables/query-plan?query=EXPLAIN SELECT * FROM users",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "query-plan"],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "EXPLAIN SELECT * FROM users"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Products",
+      "item": [
+        {
+          "name": "2-1. CREATE TABLE products",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"CREATE TABLE products (id INT, name VARCHAR, price INT, stock INT, available BOOLEAN)\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/tables/create",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "create"]
+            }
+          }
+        },
+        {
+          "name": "2-2. INSERT - Laptop",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"INSERT INTO products VALUES (id=\\\"101\\\", name=\\\"Laptop\\\", price=\\\"1200\\\", stock=\\\"15\\\", available=\\\"true\\\")\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/tables/insert",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "insert"]
+            }
+          }
+        },
+        {
+          "name": "2-3. INSERT - Mouse",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"INSERT INTO products VALUES (id=\\\"102\\\", name=\\\"Wireless Mouse\\\", price=\\\"25\\\", stock=\\\"50\\\", available=\\\"true\\\")\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/tables/insert",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "insert"]
+            }
+          }
+        },
+        {
+          "name": "2-4. INSERT - Keyboard (out of stock)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"INSERT INTO products VALUES (id=\\\"103\\\", name=\\\"Mechanical Keyboard\\\", price=\\\"80\\\", stock=\\\"0\\\", available=\\\"false\\\")\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/tables/insert",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "insert"]
+            }
+          }
+        },
+        {
+          "name": "2-5. INSERT - Monitor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"INSERT INTO products VALUES (id=\\\"104\\\", name=\\\"4K Monitor\\\", price=\\\"350\\\", stock=\\\"8\\\", available=\\\"true\\\")\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/tables/insert",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "insert"]
+            }
+          }
+        },
+        {
+          "name": "2-6. INSERT - Headphones",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"INSERT INTO products VALUES (id=\\\"105\\\", name=\\\"Bluetooth Headphones\\\", price=\\\"120\\\", stock=\\\"20\\\", available=\\\"true\\\")\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/tables/insert",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "insert"]
+            }
+          }
+        },
+        {
+          "name": "2-7. SELECT * FROM products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/api/tables/select?query=SELECT * FROM products",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "select"],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "SELECT * FROM products"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "2-8. EXPLAIN SELECT * FROM products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/api/tables/query-plan?query=EXPLAIN SELECT * FROM products",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "query-plan"],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "EXPLAIN SELECT * FROM products"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Orders",
+      "item": [
+        {
+          "name": "3-1. CREATE TABLE orders",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"CREATE TABLE orders (order_id INT, user_id INT, product_id INT, quantity INT, total_price INT)\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/tables/create",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "create"]
+            }
+          }
+        },
+        {
+          "name": "3-2. INSERT - Order 1001",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"INSERT INTO orders VALUES (order_id=\\\"1001\\\", user_id=\\\"1\\\", product_id=\\\"101\\\", quantity=\\\"1\\\", total_price=\\\"1200\\\")\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/tables/insert",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "insert"]
+            }
+          }
+        },
+        {
+          "name": "3-3. INSERT - Order 1002",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"INSERT INTO orders VALUES (order_id=\\\"1002\\\", user_id=\\\"2\\\", product_id=\\\"102\\\", quantity=\\\"2\\\", total_price=\\\"50\\\")\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/tables/insert",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "insert"]
+            }
+          }
+        },
+        {
+          "name": "3-4. INSERT - Order 1003",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"INSERT INTO orders VALUES (order_id=\\\"1003\\\", user_id=\\\"1\\\", product_id=\\\"104\\\", quantity=\\\"1\\\", total_price=\\\"350\\\")\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/tables/insert",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "insert"]
+            }
+          }
+        },
+        {
+          "name": "3-5. SELECT * FROM orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/api/tables/select?query=SELECT * FROM orders",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "select"],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "SELECT * FROM orders"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "3-6. EXPLAIN SELECT * FROM orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/api/tables/query-plan?query=EXPLAIN SELECT * FROM orders",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "query-plan"],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "EXPLAIN SELECT * FROM orders"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Logs (with TIMESTAMP)",
+      "item": [
+        {
+          "name": "4-1. CREATE TABLE logs",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"CREATE TABLE logs (log_id INT, user_id INT, action VARCHAR, created_at TIMESTAMP)\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/tables/create",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "create"]
+            }
+          }
+        },
+        {
+          "name": "4-2. INSERT - Login log",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"INSERT INTO logs VALUES (log_id=\\\"1\\\", user_id=\\\"1\\\", action=\\\"login\\\", created_at=\\\"2024-01-15T10:30:00Z\\\")\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/tables/insert",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "insert"]
+            }
+          }
+        },
+        {
+          "name": "4-3. INSERT - View product log",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"INSERT INTO logs VALUES (log_id=\\\"2\\\", user_id=\\\"1\\\", action=\\\"view_product\\\", created_at=\\\"2024-01-15T10:35:00Z\\\")\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/tables/insert",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "insert"]
+            }
+          }
+        },
+        {
+          "name": "4-4. INSERT - Purchase log",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"INSERT INTO logs VALUES (log_id=\\\"3\\\", user_id=\\\"1\\\", action=\\\"purchase\\\", created_at=\\\"2024-01-15T10:40:00Z\\\")\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/tables/insert",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "insert"]
+            }
+          }
+        },
+        {
+          "name": "4-5. SELECT * FROM logs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/api/tables/select?query=SELECT * FROM logs",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "select"],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "SELECT * FROM logs"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "4-6. EXPLAIN SELECT * FROM logs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/api/tables/query-plan?query=EXPLAIN SELECT * FROM logs",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "query-plan"],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "EXPLAIN SELECT * FROM logs"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Employees",
+      "item": [
+        {
+          "name": "5-1. CREATE TABLE employees",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"CREATE TABLE employees (emp_id INT, name VARCHAR, department VARCHAR, salary INT, hired_at TIMESTAMP)\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/tables/create",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "create"]
+            }
+          }
+        },
+        {
+          "name": "5-2. INSERT - David Lee",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"INSERT INTO employees VALUES (emp_id=\\\"1001\\\", name=\\\"David Lee\\\", department=\\\"Engineering\\\", salary=\\\"90000\\\", hired_at=\\\"2022-03-15T09:00:00Z\\\")\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/tables/insert",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "insert"]
+            }
+          }
+        },
+        {
+          "name": "5-3. INSERT - Sarah Kim",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"INSERT INTO employees VALUES (emp_id=\\\"1002\\\", name=\\\"Sarah Kim\\\", department=\\\"Marketing\\\", salary=\\\"75000\\\", hired_at=\\\"2021-06-01T09:00:00Z\\\")\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/tables/insert",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "insert"]
+            }
+          }
+        },
+        {
+          "name": "5-4. INSERT - Michael Park",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"INSERT INTO employees VALUES (emp_id=\\\"1003\\\", name=\\\"Michael Park\\\", department=\\\"Engineering\\\", salary=\\\"95000\\\", hired_at=\\\"2020-01-20T09:00:00Z\\\")\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/tables/insert",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "insert"]
+            }
+          }
+        },
+        {
+          "name": "5-5. SELECT * FROM employees",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/api/tables/select?query=SELECT * FROM employees",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "select"],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "SELECT * FROM employees"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "5-6. EXPLAIN SELECT * FROM employees",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/api/tables/query-plan?query=EXPLAIN SELECT * FROM employees",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "query-plan"],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "EXPLAIN SELECT * FROM employees"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Cleanup",
+      "item": [
+        {
+          "name": "DROP TABLE users",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/api/tables/drop?query=DROP TABLE users",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "drop"],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "DROP TABLE users"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "DROP TABLE products",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/api/tables/drop?query=DROP TABLE products",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "drop"],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "DROP TABLE products"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "DROP TABLE orders",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/api/tables/drop?query=DROP TABLE orders",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "drop"],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "DROP TABLE orders"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "DROP TABLE logs",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/api/tables/drop?query=DROP TABLE logs",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "drop"],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "DROP TABLE logs"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "DROP TABLE employees",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/api/tables/drop?query=DROP TABLE employees",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "tables", "drop"],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "DROP TABLE employees"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

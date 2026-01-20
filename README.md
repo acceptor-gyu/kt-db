@@ -70,8 +70,8 @@ Kotlin으로 구현하는 In-Memory Database
 - **역할**: 개별 클라이언트 연결 처리
 - **인스턴스**: 클라이언트 연결당 1개
 - **책임**:
-  - 핸드셰이크 및 인증
-  - 클라이언트 명령 파싱 및 처리
+  - SQL 문자열 수신 및 파싱
+  - 클라이언트 명령 처리
   - TableService 호출
   - 연결 종료 시 리소스 정리 및 ConnectionManager에서 unregister
 
@@ -83,7 +83,143 @@ Kotlin으로 구현하는 In-Memory Database
   - `compute()`, `putIfAbsent()` 등 atomic operation
   - 여러 ConnectionHandler의 동시 접근 안전
 
+### 디스크 기반 영속성 (Disk I/O)
+
+데이터베이스는 파일 기반 영속성을 지원하여 서버 재시작 후에도 데이터가 보존됩니다.
+
+#### 아키텍처
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     TableService                             │
+│  ┌───────────────────────────────────────────────┐          │
+│  │      In-Memory Cache (ConcurrentHashMap)      │          │
+│  │         - 빠른 쓰기 성능                        │          │
+│  │         - Thread-safe 동시 접근                │          │
+│  └─────────────────┬─────────────────────────────┘          │
+│                    │                                         │
+│                    ▼                                         │
+│  ┌───────────────────────────────────────────────┐          │
+│  │          TableFileManager                      │          │
+│  │   - CREATE TABLE: 파일 생성 (*.dat)           │          │
+│  │   - INSERT: 파일 업데이트                      │          │
+│  │   - SELECT: 파일에서 직접 읽기 (full scan)     │          │
+│  │   - DROP TABLE: 파일 삭제                      │          │
+│  └─────────────────┬─────────────────────────────┘          │
+└────────────────────┼─────────────────────────────────────────┘
+                     │
+                     ▼
+           ┌─────────────────────┐
+           │    Disk Storage     │
+           │  ./data/            │
+           │  ├─ users.dat       │
+           │  ├─ products.dat    │
+           │  └─ orders.dat      │
+           └─────────────────────┘
+```
+
+#### 바이너리 파일 포맷
+
+각 테이블은 `.dat` 파일로 저장되며, 다음과 같은 구조를 가집니다:
+
+```
+┌─────────────────────────────────────┐
+│ File Header (24 bytes)              │
+│  - Magic: 0xDBF0 (2 bytes)          │
+│  - Version: 1 (2 bytes)             │
+│  - Row Count: long (8 bytes)        │
+│  - Column Count: int (4 bytes)      │
+│  - Schema Length: int (4 bytes)     │
+│  - Reserved: (4 bytes)              │
+├─────────────────────────────────────┤
+│ Schema Section (variable)           │
+│  For each column:                   │
+│   - Name Length: short (2 bytes)    │
+│   - Name: UTF-8 bytes               │
+│   - Type: byte (1 byte)             │
+│     0x01=INT, 0x02=VARCHAR,         │
+│     0x03=TIMESTAMP, 0x04=BOOLEAN    │
+├─────────────────────────────────────┤
+│ Data Section (variable)             │
+│  For each row:                      │
+│   - Row Length: int (4 bytes)       │
+│   - Field Data (type-specific):     │
+│     INT: 4 bytes (Big Endian)       │
+│     VARCHAR: [2-byte len][UTF-8]    │
+│     TIMESTAMP: 8 bytes (Unix ms)    │
+│     BOOLEAN: 1 byte (0x00/0x01)     │
+└─────────────────────────────────────┘
+```
+
+#### 영속성 동작
+
+**CREATE TABLE**:
+```kotlin
+tableService.createTable("users", mapOf("id" to "INT", "name" to "VARCHAR"))
+// → 파일 생성: ./data/users.dat
+```
+
+**INSERT**:
+```kotlin
+tableService.insert("users", mapOf("id" to "1", "name" to "Alice"))
+// → 파일 업데이트: users.dat에 row 추가
+```
+
+**SELECT (Full Table Scan)**:
+```kotlin
+val table = tableService.select("users")
+// → 파일에서 직접 읽기: users.dat를 디코딩하여 Table 객체 반환
+```
+
+**서버 재시작**:
+```kotlin
+// 1. 서버 시작 시 TableService 초기화
+// 2. TableFileManager가 ./data/ 디렉토리의 모든 .dat 파일 스캔
+// 3. 각 파일을 읽어서 Table 객체로 복원
+// 4. In-memory cache에 로드
+```
+
+**DROP TABLE**:
+```kotlin
+tableService.dropTable("users")
+// → 파일 삭제: ./data/users.dat 제거
+```
+
+#### 데이터 무결성 보장
+
+- **Atomic Writes**: Temp file → sync → rename 패턴으로 원자적 쓰기 보장
+- **Crash Recovery**: 파일이 완전히 쓰여지지 않으면 temp 파일만 남고 원본은 보존됨
+- **Thread-Safe**: 파일 쓰기는 TableService의 ConcurrentHashMap atomic operation과 통합
+
+#### 설정
+
+`application.properties`:
+```properties
+db.storage.directory=./data
+db.storage.enabled=true
+```
+
 ## 요청 처리 흐름
+
+### 프로토콜 개요
+
+**단순화된 String 기반 프로토콜:**
+- 클라이언트 → 서버: SQL 문자열 (UTF-8 인코딩)
+- 서버 → 클라이언트: JSON 형식의 DbResponse
+
+```
+Client                          Server
+  │                               │
+  │  [Length: 4 bytes]            │
+  │  [SQL String: "SELECT ..."]   │
+  │──────────────────────────────▶│
+  │                               │
+  │  [Length: 4 bytes]            │
+  │  [JSON Response: {...}]       │
+  │◀──────────────────────────────│
+```
+
+### 상세 처리 흐름
 
 ```
 ┌─────────┐                                              ┌──────────────┐
@@ -113,24 +249,23 @@ Kotlin으로 구현하는 In-Memory Database
      │                                                      │Handler #1   │
      │                                                      │(Thread A)   │
      │                                                      └────┬────────┘
-     │ 6. Send Handshake (HANDSHAKE|v1.0)                       │
-     │◀─────────────────────────────────────────────────────────┤
-     │                                                           │
-     │ 7. Auth Request (AUTH|user|password)                     │
+     │ 6. SQL Request (String)                                  │
+     │    ProtocolCodec.encodeRequest("CREATE TABLE users ...") │
+     │    → [4-byte length][UTF-8 SQL string]                   │
      │──────────────────────────────────────────────────────────▶│
      │                                                           │
-     │                                      8. Verify Credentials
+     │                                      7. Decode SQL String
+     │                                         ProtocolCodec.decodeRequest()
+     │                                         → "CREATE TABLE users ..."
      │                                                           │
-     │ 9. Auth Response (Authenticated)                         │
-     │◀─────────────────────────────────────────────────────────┤
+     │                                      8. Parse SQL        │
+     │                                         - CREATE TABLE   │
+     │                                         - INSERT INTO    │
+     │                                         - SELECT         │
+     │                                         - EXPLAIN        │
+     │                                         - PING           │
      │                                                           │
-     │ 10. Command Request                                      │
-     │     (CREATE TABLE users ...)                             │
-     │──────────────────────────────────────────────────────────▶│
-     │                                                           │
-     │                                      11. Parse Command   │
-     │                                                           │
-     │                                      12. Call TableService
+     │                                      9. Call TableService
      │                                          (thread-safe)   │
      │                                          ┌────▼────────┐ │
      │                                          │TableService │ │
@@ -138,25 +273,32 @@ Kotlin으로 구현하는 In-Memory Database
      │                                          │ConcurrentMap│ │
      │                                          └────┬────────┘ │
      │                                               │          │
-     │                                      13. Execute Operation
+     │                                      10. Execute Operation
      │                                          (CREATE/INSERT/SELECT)
      │                                               │          │
      │                                          ┌────▼────────┐ │
      │                                          │  Result     │ │
      │                                          └────┬────────┘ │
      │                                               │          │
-     │ 14. Response                              ◀──┘          │
+     │                                      11. Create DbResponse
+     │                                          { success: true,
+     │                                            message: "...",
+     │                                            data: "..." }
+     │                                                           │
+     │ 12. JSON Response                                        │
+     │     ProtocolCodec.encodeResponse(DbResponse)             │
+     │     → [4-byte length][UTF-8 JSON]                        │
      │◀─────────────────────────────────────────────────────────┤
      │                                                           │
-     │ 15. Close Connection                                     │
+     │ 13. Close Connection                                     │
      │──────────────────────────────────────────────────────────▶│
      │                                                           │
-     │                                      16. Close Resources │
+     │                                      14. Close Resources │
      │                                          - input.close() │
      │                                          - output.close()│
      │                                          - socket.close()│
      │                                                           │
-     │                                      17. Unregister      │
+     │                                      15. Unregister      │
      │                                          (ConnectionManager.unregister())
      │                                                           │
      └───────────────────────────────────────────────────────────┘
@@ -601,13 +743,298 @@ cd db-server
 
 ## 빌드 및 실행
 
+### 방법 1: Docker Compose (추천)
+
+전체 시스템을 한 번에 실행합니다 (Elasticsearch + Kibana + DB Server + API Server).
+
 ```bash
-# 빌드
+# 전체 서비스 실행
+docker compose up -d --build
+
+# 서비스 상태 확인
+docker compose ps
+
+# API 테스트
+curl http://localhost:8080/api/tables/ping
+
+# 로그 확인
+docker compose logs -f api-server
+
+# 서비스 중지
+docker compose down
+```
+
+**포트 정보 (Docker):**
+- API Server: `http://localhost:8081`
+- DB Server: `tcp://localhost:9001`
+- Elasticsearch: `http://localhost:9201`
+- Kibana: `http://localhost:5602`
+
+**포트 정보 (로컬):**
+- API Server: `http://localhost:8080`
+- DB Server: `tcp://localhost:9000`
+- Elasticsearch: `http://localhost:9200`
+- Kibana: `http://localhost:5601`
+
+**동시 실행 가능:** 로컬과 Docker가 서로 다른 포트를 사용하므로 같은 PC에서 동시에 실행할 수 있습니다. 자세한 내용은 [PROFILES.md](./PROFILES.md)를 참조하세요.
+
+**데이터 영속성:**
+- 테이블 데이터: `db_db-server-data` 볼륨에 저장
+- Elasticsearch 데이터: `db_elasticsearch-data` 볼륨에 저장
+
+자세한 Docker 사용법은 [DOCKER_GUIDE.md](./DOCKER_GUIDE.md)를 참조하세요.
+
+### 방법 2: 로컬 실행 (Gradle)
+
+Gradle을 사용하여 직접 실행합니다.
+
+```bash
+# 전체 빌드
 ./gradlew build
 
-# 서버 실행
-./gradlew bootRun
+# DB 서버 실행
+./gradlew :db-server:bootRun
+
+# API 서버 실행 (별도 터미널)
+./gradlew :api-server:bootRun
 
 # 테스트
 ./gradlew test
 ```
+
+**주의:** Elasticsearch와 Kibana가 필요한 EXPLAIN 기능을 사용하려면 먼저 Docker Compose로 Elasticsearch를 실행해야 합니다:
+```bash
+docker compose up -d elasticsearch kibana
+```
+
+## API 사용 방법
+
+### REST API 엔드포인트
+
+API 서버는 HTTP REST API를 제공합니다.
+
+**Docker 환경 (포트 8081):**
+
+```bash
+# CREATE TABLE
+curl -X POST http://localhost:8081/api/tables/create \
+  -H "Content-Type: application/json" \
+  -d '{"query": "CREATE TABLE users (id INT, name VARCHAR, age INT)"}'
+
+# INSERT
+curl -X POST http://localhost:8081/api/tables/insert \
+  -H "Content-Type: application/json" \
+  -d '{"query": "INSERT INTO users VALUES (id=\"1\", name=\"John\", age=\"30\")"}'
+
+# SELECT
+curl -X GET 'http://localhost:8081/api/tables/select?query=SELECT%20*%20FROM%20users'
+
+# EXPLAIN
+curl -X GET 'http://localhost:8081/api/tables/query-plan?query=EXPLAIN%20SELECT%20*%20FROM%20users'
+
+# DROP TABLE
+curl -X DELETE 'http://localhost:8081/api/tables/drop?query=DROP%20TABLE%20users'
+```
+
+**로컬 환경 (포트 8080):**
+
+```bash
+# 포트만 8080으로 변경하면 됩니다
+curl -X POST http://localhost:8080/api/tables/create ...
+```
+
+### 자동화된 테스트
+
+```bash
+# 전체 테스트 시나리오 실행 (5개 테이블, 19개 레코드)
+cd api-server
+./test-api-requests.sh
+```
+
+자세한 API 사용법은 다음 문서를 참조하세요:
+- [API_USAGE.md](./api-server/API_USAGE.md) - 전체 API 가이드
+- [TEST_README.md](./api-server/TEST_README.md) - 테스트 방법
+
+## 프로토콜 아키텍처
+
+### 단순화된 String 기반 프로토콜
+
+프로젝트 초기에는 `DbRequest`와 `DbCommand` enum을 사용한 구조화된 프로토콜을 사용했으나, 불필요한 복잡성을 제거하고 **순수 String 기반 프로토콜**로 단순화했습니다.
+
+#### 이전 프로토콜 (복잡)
+
+```kotlin
+// 클라이언트 측
+val request = DbRequest(
+    command = DbCommand.RAW_SQL,
+    sql = "CREATE TABLE users (id INT, name VARCHAR)"
+)
+val requestBytes = ProtocolCodec.encodeRequest(request)  // JSON 직렬화
+// → {"command":"RAW_SQL","sql":"CREATE TABLE..."}
+
+// 서버 측
+val request = ProtocolCodec.decodeRequest(bytes)  // JSON 역직렬화
+val sql = request.sql  // SQL 추출
+// SQL 파싱 및 처리...
+```
+
+**문제점:**
+- 중복된 계층: `DbCommand.RAW_SQL`이 단순히 SQL 문자열을 감싸는 래퍼 역할만 수행
+- 불필요한 JSON 직렬화/역직렬화 오버헤드
+- DbRequest, DbCommand 클래스 유지보수 필요
+
+#### 현재 프로토콜 (단순)
+
+```kotlin
+// 클라이언트 측
+val sql = "CREATE TABLE users (id INT, name VARCHAR)"
+val requestBytes = ProtocolCodec.encodeRequest(sql)  // UTF-8 인코딩
+// → "CREATE TABLE users..."
+
+// 서버 측
+val sql = ProtocolCodec.decodeRequest(bytes)  // UTF-8 디코딩
+// SQL 파싱 및 처리...
+```
+
+**장점:**
+- 단순성: SQL 문자열을 직접 전송
+- 성능: JSON 직렬화 불필요, UTF-8 인코딩만 수행
+- 유지보수: 중간 DTO 클래스 제거
+
+### 프로토콜 메시지 형식
+
+#### 요청 메시지 (Client → Server)
+
+```
+┌────────────────┬──────────────────────────────┐
+│ Length (4 byte)│ SQL String (UTF-8)           │
+├────────────────┼──────────────────────────────┤
+│ 0x00000023     │ "CREATE TABLE users ..."     │
+└────────────────┴──────────────────────────────┘
+     35 bytes           SQL 내용
+```
+
+#### 응답 메시지 (Server → Client)
+
+```
+┌────────────────┬──────────────────────────────┐
+│ Length (4 byte)│ JSON Response (UTF-8)        │
+├────────────────┼──────────────────────────────┤
+│ 0x0000004A     │ {"success":true,...}         │
+└────────────────┴──────────────────────────────┘
+     74 bytes          DbResponse JSON
+```
+
+### ProtocolCodec 구현
+
+```kotlin
+object ProtocolCodec {
+    // 요청 인코딩: SQL 문자열 → 바이트 배열
+    fun encodeRequest(sql: String): ByteArray {
+        return sql.toByteArray(StandardCharsets.UTF_8)
+    }
+
+    // 요청 디코딩: 바이트 배열 → SQL 문자열
+    fun decodeRequest(bytes: ByteArray): String {
+        return bytes.toString(StandardCharsets.UTF_8)
+    }
+
+    // 응답 인코딩: DbResponse → JSON 바이트 배열
+    fun encodeResponse(response: DbResponse): ByteArray {
+        val jsonString = json.encodeToString(response)
+        return jsonString.toByteArray(StandardCharsets.UTF_8)
+    }
+
+    // 응답 디코딩: JSON 바이트 배열 → DbResponse
+    fun decodeResponse(bytes: ByteArray): DbResponse {
+        val jsonString = bytes.toString(StandardCharsets.UTF_8)
+        return json.decodeFromString(jsonString)
+    }
+
+    // 메시지 쓰기: 길이(4 byte) + 데이터
+    fun writeMessage(output: OutputStream, data: ByteArray) {
+        val dos = DataOutputStream(output)
+        dos.writeInt(data.size)
+        dos.write(data)
+        dos.flush()
+    }
+
+    // 메시지 읽기: 길이 읽고 → 데이터 읽기
+    fun readMessage(input: InputStream): ByteArray {
+        val dis = DataInputStream(input)
+        val length = dis.readInt()
+        val data = ByteArray(length)
+        dis.readFully(data)
+        return data
+    }
+}
+```
+
+### 지원하는 SQL 명령
+
+서버는 다음 SQL 명령을 파싱하고 처리합니다:
+
+| 명령 | 형식 | 예시 |
+|------|------|------|
+| **CREATE TABLE** | `CREATE TABLE <name> (col type, ...)` | `CREATE TABLE users (id INT, name VARCHAR)` |
+| **INSERT** | `INSERT INTO <table> VALUES (col="val", ...)` | `INSERT INTO users VALUES (id="1", name="John")` |
+| **SELECT** | `SELECT * FROM <table> [WHERE ...]` | `SELECT * FROM users WHERE id="1"` |
+| **DROP TABLE** | `DROP TABLE <name>` | `DROP TABLE users` |
+| **EXPLAIN** | `EXPLAIN <query>` | `EXPLAIN SELECT * FROM users` |
+| **PING** | `PING` | `PING` |
+
+### ConnectionHandler SQL 파싱
+
+```kotlin
+private fun processRequest(sql: String): DbResponse {
+    val trimmedSql = sql.trim().trimEnd(';')
+
+    // PING 명령 처리
+    if (trimmedSql.equals("PING", ignoreCase = true)) {
+        return DbResponse(success = true, message = "pong")
+    }
+
+    return when {
+        trimmedSql.startsWith("CREATE TABLE", ignoreCase = true)
+            -> parseAndHandleCreateTable(trimmedSql)
+        trimmedSql.startsWith("INSERT INTO", ignoreCase = true)
+            -> parseAndHandleInsert(trimmedSql)
+        trimmedSql.startsWith("SELECT", ignoreCase = true)
+            -> parseAndHandleSelect(trimmedSql)
+        trimmedSql.startsWith("DROP TABLE", ignoreCase = true)
+            -> parseAndHandleDropTable(trimmedSql)
+        trimmedSql.startsWith("EXPLAIN", ignoreCase = true)
+            -> parseAndHandleExplain(trimmedSql)
+        else -> DbResponse(
+            success = false,
+            message = "Unsupported SQL query: $sql",
+            errorCode = 400
+        )
+    }
+}
+```
+
+### 아키텍처 비교
+
+#### 이전 (복잡한 계층)
+```
+Client: SQL → DbRequest(RAW_SQL) → JSON → TCP → Server
+Server: TCP → JSON → DbRequest → SQL 추출 → 파싱 → 실행
+```
+
+#### 현재 (단순한 흐름)
+```
+Client: SQL → UTF-8 → TCP → Server
+Server: TCP → UTF-8 → SQL → 파싱 → 실행
+```
+
+**제거된 파일:**
+- `common/protocol/DbRequest.kt` - 요청 DTO
+- `common/protocol/DbCommand.kt` - 명령 enum
+- `api-server/util/SqlParser.kt` - API 서버의 SQL 파서 (db-server로 통합)
+
+**변경된 파일:**
+- `common/protocol/ProtocolCodec.kt` - String 인코딩/디코딩으로 단순화
+- `db-server/ConnectionHandler.kt` - SQL 문자열 직접 처리
+- `api-server/DbClient.kt` - SQL 문자열 직접 전송
+- `api-server/TableController.kt` - DbRequest 생성 제거

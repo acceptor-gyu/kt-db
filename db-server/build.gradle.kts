@@ -4,11 +4,11 @@ plugins {
     kotlin("plugin.spring")
     id("org.springframework.boot")
     id("io.spring.dependency-management")
-    application
 }
 
-application {
-    mainClass.set("study.db.server.DbServerApplicationKt")
+// Configure Spring Boot to use the correct main class
+springBoot {
+    mainClass.set("study.db.server.DbServerApplication")
 }
 
 tasks.register<JavaExec>("runInitElasticsearch") {
@@ -43,11 +43,13 @@ tasks.register<JavaExec>("runExplainExample") {
 dependencies {
     implementation(project(":common"))
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+    implementation("com.google.code.gson:gson:2.10.1")
 
     // Elasticsearch를 편하게 활용하기 위한 Spring Boot 관련 설정
     implementation("org.springframework.boot:spring-boot-starter")
     implementation("org.springframework.boot:spring-boot-starter-data-elasticsearch")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")

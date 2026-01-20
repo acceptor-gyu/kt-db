@@ -5,8 +5,6 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.*
-import study.db.common.protocol.DbCommand
-import study.db.common.protocol.DbRequest
 import study.db.common.protocol.ProtocolCodec
 import study.db.server.service.TableService
 import java.io.DataInputStream
@@ -277,16 +275,11 @@ class ConnectionHandlerTest {
         @Test
         @DisplayName("ProtocolCodec을 통한 요청 처리 구조 확인")
         fun `protocol codec request structure is available`() {
-            // Given: DbRequest 생성
-            val request = DbRequest(
-                command = DbCommand.PING,
-                tableName = null,
-                columns = null,
-                values = null
-            )
+            // Given: PING SQL 문자열
+            val sql = "PING"
 
             // When: 요청 인코딩
-            val encoded = ProtocolCodec.encodeRequest(request)
+            val encoded = ProtocolCodec.encodeRequest(sql)
 
             // Then: 정상적으로 인코딩됨
             assertNotNull(encoded)
@@ -296,43 +289,31 @@ class ConnectionHandlerTest {
         @Test
         @DisplayName("CREATE_TABLE 명령 요청 생성")
         fun `can create CREATE_TABLE request`() {
-            // Given: CREATE TABLE 요청
-            val request = DbRequest(
-                command = DbCommand.CREATE_TABLE,
-                tableName = "users",
-                columns = mapOf("id" to "INT", "name" to "VARCHAR"),
-                values = null
-            )
+            // Given: CREATE TABLE SQL 문자열
+            val sql = "CREATE TABLE users (id INT, name VARCHAR)"
 
             // When: 요청 인코딩 및 디코딩
-            val encoded = ProtocolCodec.encodeRequest(request)
+            val encoded = ProtocolCodec.encodeRequest(sql)
             val decoded = ProtocolCodec.decodeRequest(encoded)
 
             // Then: 요청이 정상적으로 복원됨
-            assertEquals(DbCommand.CREATE_TABLE, decoded.command)
-            assertEquals("users", decoded.tableName)
-            assertNotNull(decoded.columns)
+            assertEquals(sql, decoded)
+            assertTrue(decoded.startsWith("CREATE TABLE"))
         }
 
         @Test
         @DisplayName("INSERT 명령 요청 생성")
         fun `can create INSERT request`() {
-            // Given: INSERT 요청
-            val request = DbRequest(
-                command = DbCommand.INSERT,
-                tableName = "users",
-                columns = null,
-                values = mapOf("id" to "1", "name" to "John")
-            )
+            // Given: INSERT SQL 문자열
+            val sql = "INSERT INTO users VALUES (id=\"1\", name=\"John\")"
 
             // When: 요청 인코딩 및 디코딩
-            val encoded = ProtocolCodec.encodeRequest(request)
+            val encoded = ProtocolCodec.encodeRequest(sql)
             val decoded = ProtocolCodec.decodeRequest(encoded)
 
             // Then: 요청이 정상적으로 복원됨
-            assertEquals(DbCommand.INSERT, decoded.command)
-            assertEquals("users", decoded.tableName)
-            assertNotNull(decoded.values)
+            assertEquals(sql, decoded)
+            assertTrue(decoded.startsWith("INSERT INTO"))
         }
     }
 
