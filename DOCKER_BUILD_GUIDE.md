@@ -2,6 +2,26 @@
 
 이 프로젝트는 **변경된 컨테이너만 재빌드**되도록 최적화되어 있습니다.
 
+## 🤔 왜 최적화가 필요한가?
+
+**일반적인 Docker 빌드의 문제:**
+```bash
+# db-server/src/main/kotlin/service/TableService.kt 한 줄 수정
+docker compose up -d --build
+
+# 결과: db-server AND api-server 모두 5분 동안 재빌드 😱
+# 왜? Dockerfile에서 전체 프로젝트를 COPY하기 때문
+```
+
+**최적화 후:**
+```bash
+# db-server/src/main/kotlin/service/TableService.kt 한 줄 수정
+docker compose up -d --build
+
+# 결과: db-server만 30초 만에 재빌드 ⚡
+# api-server는 "Using cache" (변경 없음)
+```
+
 ## 🚀 빠른 시작
 
 ### BuildKit 활성화 (필수)
