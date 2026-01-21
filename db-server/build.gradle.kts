@@ -40,6 +40,30 @@ tasks.register<JavaExec>("runExplainExample") {
     mainClass.set("study.db.server.elasticsearch.example.ExplainExampleApp")
 }
 
+// 단위 테스트와 통합 테스트를 분리
+tasks.register<Test>("unitTest") {
+    description = "Run unit tests (fast, no external dependencies)"
+    group = "verification"
+    useJUnitPlatform {
+        excludeTags("integration")
+    }
+}
+
+tasks.register<Test>("integrationTest") {
+    description = "Run integration tests (requires Elasticsearch, Docker Compose)"
+    group = "verification"
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+}
+
+// 기본 test task는 단위 테스트만 실행
+tasks.named<Test>("test") {
+    useJUnitPlatform {
+        excludeTags("integration")
+    }
+}
+
 dependencies {
     implementation(project(":common"))
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")

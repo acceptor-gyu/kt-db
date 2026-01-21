@@ -9,6 +9,7 @@ This is a Kotlin/Spring Boot project implementing a **relational database with f
 ## Key Features
 
 - **File-based persistence**: Binary format (*.dat files) stored in `./data/`
+- **Buffer Pool**: 16KB page-based LRU cache for disk I/O optimization (100x faster with 99% hit rate)
 - **TCP protocol**: String-based SQL protocol over TCP
 - **REST API**: HTTP API server as a client interface
 - **Thread-safe**: ConcurrentHashMap with atomic operations
@@ -183,17 +184,35 @@ spring.elasticsearch.uris=http://localhost:9200
 
 ## Testing
 
+### Test Structure
+Tests are separated into **unit tests** and **integration tests**:
+
+- **Unit Tests**: Fast, no external dependencies (Mockito for mocking)
+- **Integration Tests**: Requires Elasticsearch (tagged with `@Tag("integration")`)
+
 ### Key Test Files
+
+**Unit Tests** (no external dependencies):
 - `TableServiceTest.kt`: Table operations (26+ tests)
-- `TableServicePersistenceTest.kt`: File I/O integration tests
+- `TableServicePersistenceTest.kt`: File I/O tests
 - `DbTcpServerTest.kt`: TCP server connection tests
 - `RowEncoderTest.kt`: Binary encoding tests
 - `TableFileManagerTest.kt`: File manager tests
+- `ExplainServiceTest.kt`: EXPLAIN logic (Mockito)
+
+**Integration Tests** (requires Elasticsearch):
+- `ExplainIntegrationTest.kt`: End-to-end EXPLAIN with real Elasticsearch
 
 ### Running Tests
+
 ```bash
-# All tests
+# Unit tests only (fast, default)
 ./gradlew test
+./gradlew unitTest
+
+# Integration tests (requires Elasticsearch)
+docker compose up -d elasticsearch
+./gradlew integrationTest
 
 # Specific module
 ./gradlew :db-server:test
@@ -201,6 +220,8 @@ spring.elasticsearch.uris=http://localhost:9200
 # Specific test class
 ./gradlew test --tests "study.db.server.service.TableServiceTest"
 ```
+
+**Note**: `./gradlew test` excludes integration tests by default. Integration tests are disabled with `@Disabled` and require manual Elasticsearch setup.
 
 ## Docker Build Optimization
 

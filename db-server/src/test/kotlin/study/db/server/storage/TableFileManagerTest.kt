@@ -296,4 +296,116 @@ class TableFileManagerTest {
         assertTrue(file.isFile)
         assertTrue(file.length() > 0)
     }
+
+    @Test
+    @DisplayName("readPage - 첫 번째 페이지 읽기")
+    fun `reads first page successfully`() {
+        // Given: 테이블 생성 및 저장
+        val table = Table(
+            tableName = "page_test",
+            dataType = mapOf("id" to "INT", "name" to "VARCHAR"),
+            rows = (1..10).map { mapOf("id" to it.toString(), "name" to "User$it") }
+        )
+        tableFileManager.writeTable(table)
+
+        // When: 첫 번째 페이지 읽기
+        val page = tableFileManager.readPage("page_test", 0)
+
+        // Then: 페이지가 정상적으로 읽혀야 함
+        assertNotNull(page)
+        assertEquals("page_test", page?.pageId?.tableName)
+        assertEquals(0, page?.pageId?.pageNumber)
+        assertTrue((page?.data?.size ?: 0) > 0)
+        assertTrue((page?.recordCount ?: 0) > 0)
+    }
+
+    @Test
+    @DisplayName("readPage - 존재하지 않는 페이지는 null 반환")
+    fun `returns null for non-existent page`() {
+        // Given: 작은 테이블 (1페이지만 존재)
+        val table = Table(
+            tableName = "small_table",
+            dataType = mapOf("id" to "INT"),
+            rows = listOf(mapOf("id" to "1"))
+        )
+        tableFileManager.writeTable(table)
+
+        // When: 큰 페이지 번호로 읽기 시도
+        val page = tableFileManager.readPage("small_table", 100)
+
+        // Then: null 반환
+        assertNull(page)
+    }
+
+    @Test
+    @DisplayName("readPage - 존재하지 않는 테이블은 null 반환")
+    fun `readPage returns null for non-existent table`() {
+        val page = tableFileManager.readPage("non_existent", 0)
+        assertNull(page)
+    }
+
+    @Test
+    @DisplayName("getPageCount - 테이블의 페이지 수 계산")
+    fun `calculates page count correctly`() {
+        // Given: 테이블 생성
+        val table = Table(
+            tableName = "count_test",
+            dataType = mapOf("id" to "INT", "name" to "VARCHAR"),
+            rows = (1..50).map { mapOf("id" to it.toString(), "name" to "User$it") }
+        )
+        tableFileManager.writeTable(table)
+
+        // When: 페이지 수 조회
+        val pageCount = tableFileManager.getPageCount("count_test")
+
+        // Then: 0보다 커야 함
+        assertTrue(pageCount > 0)
+    }
+
+    @Test
+    @DisplayName("getPageCount - 빈 테이블은 0 또는 1 페이지")
+    fun `empty table has zero or one page`() {
+        val table = Table(
+            tableName = "empty",
+            dataType = mapOf("id" to "INT"),
+            rows = emptyList()
+        )
+        tableFileManager.writeTable(table)
+
+        val pageCount = tableFileManager.getPageCount("empty")
+        assertTrue(pageCount in 0..1)
+    }
+
+    @Test
+    @DisplayName("getPageCount - 존재하지 않는 테이블은 0 반환")
+    fun `getPageCount returns 0 for non-existent table`() {
+        val pageCount = tableFileManager.getPageCount("non_existent")
+        assertEquals(0, pageCount)
+    }
+
+    @Test
+    @DisplayName("readPage - 여러 페이지 순차적으로 읽기")
+    fun `reads multiple pages sequentially`() {
+        // Given: 대용량 테이블 (여러 페이지)
+        val rows = (1..200).map { mapOf("id" to it.toString(), "data" to "x".repeat(100)) }
+        val table = Table(
+            tableName = "multi_page",
+            dataType = mapOf("id" to "INT", "data" to "VARCHAR"),
+            rows = rows
+        )
+        tableFileManager.writeTable(table)
+
+        // When: 여러 페이지 읽기
+        val pageCount = tableFileManager.getPageCount("multi_page")
+        val pages = (0 until pageCount).mapNotNull {
+            tableFileManager.readPage("multi_page", it)
+        }
+
+        // Then: 모든 페이지가 읽혀야 함
+        assertEquals(pageCount, pages.size)
+        pages.forEachIndexed { index, page ->
+            assertEquals("multi_page", page.pageId.tableName)
+            assertEquals(index, page.pageId.pageNumber)
+        }
+    }
 }
