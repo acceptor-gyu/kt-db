@@ -7,6 +7,7 @@ Kotlin으로 구현하는 관계형 데이터베이스
 ## ✨ 주요 기능
 
 - **📦 파일 기반 영속성**: 바이너리 형식으로 테이블 데이터를 디스크에 저장 (서버 재시작 후 복원)
+- **⚡ Buffer Pool (페이지 캐싱)**: 16KB 페이지 단위 LRU 캐시로 디스크 I/O 최소화 (99% hit rate 시 100배 성능 향상)
 - **🔍 EXPLAIN 쿼리 분석**: Elasticsearch 기반 쿼리 실행 계획 생성 및 최적화
 - **🔒 Thread-Safe 설계**: ConcurrentHashMap과 atomic operation으로 동시성 보장
 - **🚀 Docker 빌드 최적화**: 레이어 캐싱으로 재빌드 시간 90% 단축 (5분 → 30초)
@@ -1119,12 +1120,14 @@ Server: TCP → UTF-8 → SQL → 파싱 → 실행
 | 문서 | 설명 |
 |------|------|
 | [README.md](./README.md) | 프로젝트 개요, 아키텍처, API 사용법 |
+| [BUFFER_POOL_GUIDE.md](./BUFFER_POOL_GUIDE.md) | **Buffer Pool 개념 및 원리** (LRU 캐싱, 성능 최적화) |
 | [DOCKER_GUIDE.md](./DOCKER_GUIDE.md) | Docker Compose 사용 가이드 (실행, 로그, 트러블슈팅) |
 | [DOCKER_BUILD_GUIDE.md](./DOCKER_BUILD_GUIDE.md) | Docker 빌드 최적화 가이드 (레이어 캐싱, BuildKit) |
 | [EXPLAIN_GUIDE.md](./EXPLAIN_GUIDE.md) | EXPLAIN 쿼리 분석 기능 상세 가이드 |
 | [PROFILES.md](./PROFILES.md) | Spring Profile 설정 및 환경별 구성 |
 
 **핵심 개념:**
+- **Buffer Pool**: BUFFER_POOL_GUIDE.md (페이지 캐싱, LRU, 성능 최적화)
 - **디스크 I/O**: README.md > "디스크 기반 영속성" 섹션
 - **Thread-Safety**: README.md > "Thread-Safety 보장" 섹션
 - **EXPLAIN**: EXPLAIN_GUIDE.md

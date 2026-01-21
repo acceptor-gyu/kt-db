@@ -3,11 +3,7 @@ package study.db.server.service
 import org.slf4j.LoggerFactory
 import study.db.common.Table
 import study.db.server.db_engine.Resolver
-import study.db.server.exception.ColumnNotFoundException
-import study.db.server.exception.TypeMismatchException
-import study.db.server.exception.UnsupportedTypeException
 import study.db.server.storage.TableFileManager
-import study.db.server.validation.TypeValidator
 import java.util.concurrent.ConcurrentHashMap
 
 /**

@@ -1,5 +1,6 @@
 package study.db.server.storage
 
+import org.slf4j.LoggerFactory
 import study.db.common.Table
 import study.db.server.exception.UnsupportedTypeException
 import java.io.File
@@ -9,7 +10,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /**
- * TableFileManager - 테이블 파일 기반 저장/로드 관리자
+ * TableFileManager - 테이블 파일 기반 저장/로드 관리자 (BufferPool 통합)
  *
  * 파일 형식:
  * - Header (24 bytes): Magic, Version, Row Count, Column Count, Schema Length, Reserved
@@ -17,11 +18,18 @@ import java.nio.ByteOrder
  * - Data Section: Row Length, Field Data
  *
  * 파일명: {tableName}.dat
+ *
+ * @param dataDirectory 데이터 파일 저장 디렉토리
+ * @param rowEncoder Row 인코더/디코더
+ * @param bufferPool BufferPool (optional) - 페이지 캐싱용
  */
 class TableFileManager(
     private val dataDirectory: File,
-    private val rowEncoder: RowEncoder
+    private val rowEncoder: RowEncoder,
+    private val bufferPool: BufferPool? = null  // Optional BufferPool
 ) {
+    private val logger = LoggerFactory.getLogger(TableFileManager::class.java)
+
     init {
         if (!dataDirectory.exists()) {
             dataDirectory.mkdirs()
@@ -266,12 +274,15 @@ class TableFileManager(
     }
 
     /**
-     * 테이블 파일 삭제
+     * 테이블 파일 삭제 (BufferPool 무효화 포함)
      *
      * @param tableName 테이블 이름
      * @return 삭제 성공 여부
      */
     fun deleteTable(tableName: String): Boolean {
+        // BufferPool에서 테이블의 모든 페이지 제거
+        bufferPool?.invalidateTable(tableName)
+
         val file = File(dataDirectory, "$tableName.dat")
         return file.delete()
     }
@@ -288,13 +299,37 @@ class TableFileManager(
     }
 
     /**
-     * 특정 페이지만 읽기 (Buffer Pool용)
+     * 특정 페이지만 읽기 (BufferPool 통합)
+     *
+     * BufferPool이 있으면 캐시에서 먼저 찾고, 없으면 디스크에서 로드
+     * BufferPool이 없으면 직접 디스크에서 읽기
      *
      * @param tableName 테이블 이름
      * @param pageNumber 페이지 번호 (0부터 시작)
      * @return Page 객체 또는 null (페이지가 존재하지 않을 경우)
      */
     fun readPage(tableName: String, pageNumber: Int): Page? {
+        val pageId = PageId(tableName, pageNumber)
+
+        // BufferPool이 있으면 캐시 사용
+        return if (bufferPool != null) {
+            bufferPool.getPage(pageId) {
+                readPageFromDisk(tableName, pageNumber)
+            }
+        } else {
+            // BufferPool이 없으면 직접 디스크에서 읽기
+            readPageFromDisk(tableName, pageNumber)
+        }
+    }
+
+    /**
+     * 디스크에서 페이지 읽기 (BufferPool의 loader 함수)
+     *
+     * @param tableName 테이블 이름
+     * @param pageNumber 페이지 번호
+     * @return Page 객체 또는 null
+     */
+    private fun readPageFromDisk(tableName: String, pageNumber: Int): Page? {
         val file = File(dataDirectory, "$tableName.dat")
         if (!file.exists()) return null
 
@@ -324,7 +359,7 @@ class TableFileManager(
 
                 if (bytesRead <= 0) return@use null
 
-                // 7. 이 페이지의 레코드 수 계산 (간단 버전)
+                // 7. 이 페이지의 레코드 수 계산
                 val recordCount = countRecordsInPageData(pageData, bytesRead, schema)
 
                 Page(
