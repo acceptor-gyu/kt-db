@@ -112,36 +112,101 @@ class TableFileManager(
     }
 
     /**
-     * 파일에서 테이블 읽기
+     * 파일에서 테이블 읽기 (readPage 기반)
+     *
+     * 모든 페이지를 순회하며 rows를 수집합니다.
+     * 이제 readPage가 유일한 디스크 I/O 지점입니다.
      *
      * @param fileName 테이블 이름 (확장자 제외)
      * @return 읽은 테이블 또는 null (파일 없음)
      */
     fun readTable(fileName: String): Table? {
+        // 1. 파일 존재 여부 확인
         val file = File(dataDirectory, "$fileName.dat")
         if (!file.exists()) return null
 
         try {
-            return RandomAccessFile(file, "r").use { raf ->
-                // Read and validate header
-                val (rowCount, columnCount) = readHeader(raf)
+            // 2. 스키마 정보 읽기
+            val schema = readTableSchema(fileName) ?: return null
 
-                // Read schema
-                val schema = readSchema(raf, columnCount)
-
-                // Read data rows
-                val rows = mutableListOf<Map<String, String>>()
-                for (i in 0 until rowCount) {
-                    val rowBytes = readRowBytes(raf)
-                    val row = rowEncoder.decodeRow(rowBytes, schema)
-                    rows.add(row)
-                }
-
-                Table(fileName, schema, rows)
+            // 3. 페이지 수 확인
+            val pageCount = getPageCount(fileName)
+            if (pageCount == 0) {
+                // 빈 테이블
+                return Table(fileName, schema, emptyList())
             }
+
+            // 4. 모든 페이지를 순회하며 rows 수집
+            val allRows = mutableListOf<Map<String, String>>()
+            for (pageNumber in 0 until pageCount) {
+                val page = readPage(fileName, pageNumber) ?: continue
+                val rows = decodePageToRows(page, schema)
+                allRows.addAll(rows)
+            }
+
+            return Table(fileName, schema, allRows)
         } catch (e: Exception) {
             throw IOException("Failed to read table $fileName", e)
         }
+    }
+
+    /**
+     * 테이블의 스키마만 읽기
+     *
+     * @param tableName 테이블 이름
+     * @return 스키마 (컬럼명 -> 타입) 또는 null
+     */
+    private fun readTableSchema(tableName: String): Map<String, String>? {
+        val file = File(dataDirectory, "$tableName.dat")
+        if (!file.exists()) return null
+
+        try {
+            return RandomAccessFile(file, "r").use { raf ->
+                val (_, columnCount) = readHeader(raf)
+                readSchema(raf, columnCount)
+            }
+        } catch (e: Exception) {
+            return null
+        }
+    }
+
+    /**
+     * Page 데이터를 Row 리스트로 디코딩
+     *
+     * @param page 페이지 객체
+     * @param schema 테이블 스키마
+     * @return Row 리스트
+     */
+    private fun decodePageToRows(page: Page, schema: Map<String, String>): List<Map<String, String>> {
+        val rows = mutableListOf<Map<String, String>>()
+        var offset = 0
+        val pageData = page.data
+
+        try {
+            while (offset < pageData.size) {
+                // Row length 읽기 (4 bytes)
+                if (offset + 4 > pageData.size) break
+
+                val lengthBuffer = ByteBuffer.wrap(pageData, offset, 4).order(ByteOrder.BIG_ENDIAN)
+                val rowLength = lengthBuffer.getInt()
+
+                if (rowLength <= 0 || offset + 4 + rowLength > pageData.size) break
+
+                // Row bytes 추출 (length prefix 포함)
+                val rowBytes = ByteArray(4 + rowLength)
+                System.arraycopy(pageData, offset, rowBytes, 0, 4 + rowLength)
+
+                // Decode row
+                val row = rowEncoder.decodeRow(rowBytes, schema)
+                rows.add(row)
+
+                offset += 4 + rowLength
+            }
+        } catch (e: Exception) {
+            // 파싱 오류 시 현재까지 디코딩한 rows 반환
+        }
+
+        return rows
     }
 
     /**
@@ -201,21 +266,6 @@ class TableFileManager(
     }
 
     /**
-     * 행 데이터 읽기 (row length prefix 포함)
-     */
-    private fun readRowBytes(raf: RandomAccessFile): ByteArray {
-        val lengthBytes = ByteArray(4)
-        raf.readFully(lengthBytes)
-        val length = ByteBuffer.wrap(lengthBytes).order(ByteOrder.BIG_ENDIAN).getInt()
-
-        val rowBytes = ByteArray(4 + length)
-        System.arraycopy(lengthBytes, 0, rowBytes, 0, 4)
-        raf.readFully(rowBytes, 4, length)
-
-        return rowBytes
-    }
-
-    /**
      * 테이블 파일 삭제
      *
      * @param tableName 테이블 이름
@@ -235,5 +285,127 @@ class TableFileManager(
         return dataDirectory.listFiles { _, name ->
             name.endsWith(".dat") && !name.endsWith(".tmp")
         }?.map { it.nameWithoutExtension } ?: emptyList()
+    }
+
+    /**
+     * 특정 페이지만 읽기 (Buffer Pool용)
+     *
+     * @param tableName 테이블 이름
+     * @param pageNumber 페이지 번호 (0부터 시작)
+     * @return Page 객체 또는 null (페이지가 존재하지 않을 경우)
+     */
+    fun readPage(tableName: String, pageNumber: Int): Page? {
+        val file = File(dataDirectory, "$tableName.dat")
+        if (!file.exists()) return null
+
+        try {
+            return RandomAccessFile(file, "r").use { raf ->
+                // 1. Header + Schema 크기 계산
+                val (rowCount, columnCount) = readHeader(raf)
+                val schema = readSchema(raf, columnCount)
+                val metadataSize = calculateMetadataSize(schema)
+
+                // 2. 데이터 섹션의 시작 위치
+                val dataStartOffset = metadataSize
+
+                // 3. Page offset 계산
+                val pageOffset = dataStartOffset + (pageNumber * Page.PAGE_SIZE)
+
+                // 4. 파일 크기 확인
+                if (pageOffset >= file.length()) return@use null
+
+                // 5. Page 위치로 seek
+                raf.seek(pageOffset)
+
+                // 6. 16KB 읽기 (또는 남은 크기만큼)
+                val remaining = (file.length() - pageOffset).coerceAtMost(Page.PAGE_SIZE.toLong()).toInt()
+                val pageData = ByteArray(Page.PAGE_SIZE)
+                val bytesRead = raf.read(pageData, 0, remaining)
+
+                if (bytesRead <= 0) return@use null
+
+                // 7. 이 페이지의 레코드 수 계산 (간단 버전)
+                val recordCount = countRecordsInPageData(pageData, bytesRead, schema)
+
+                Page(
+                    pageId = PageId(tableName, pageNumber),
+                    data = pageData.copyOf(bytesRead),
+                    recordCount = recordCount,
+                    freeSpaceOffset = Page.HEADER_SIZE + bytesRead
+                )
+            }
+        } catch (e: Exception) {
+            throw IOException("Failed to read page $pageNumber from table $tableName", e)
+        }
+    }
+
+    /**
+     * 테이블의 페이지 수 계산
+     *
+     * @param tableName 테이블 이름
+     * @return 페이지 수 (0이면 파일 없음)
+     */
+    fun getPageCount(tableName: String): Int {
+        val file = File(dataDirectory, "$tableName.dat")
+        if (!file.exists()) return 0
+
+        try {
+            return RandomAccessFile(file, "r").use { raf ->
+                val (_, columnCount) = readHeader(raf)
+                val schema = readSchema(raf, columnCount)
+                val metadataSize = calculateMetadataSize(schema)
+
+                val dataSize = file.length() - metadataSize
+                val pageCount = ((dataSize + Page.PAGE_SIZE - 1) / Page.PAGE_SIZE).toInt()
+
+                pageCount.coerceAtLeast(0)
+            }
+        } catch (e: Exception) {
+            return 0
+        }
+    }
+
+    /**
+     * 메타데이터 크기 계산 (Header + Schema)
+     */
+    private fun calculateMetadataSize(schema: Map<String, String>): Long {
+        val headerSize = 24L
+        val schemaSize = schema.entries.sumOf { (name, _) ->
+            2 + name.toByteArray(Charsets.UTF_8).size + 1
+        }
+        return headerSize + schemaSize
+    }
+
+    /**
+     * 페이지 데이터 내의 레코드 수 카운트
+     *
+     * 현재는 간단하게 구현 (나중에 개선 가능)
+     */
+    private fun countRecordsInPageData(
+        pageData: ByteArray,
+        validBytes: Int,
+        schema: Map<String, String>
+    ): Int {
+        var count = 0
+        var offset = 0
+
+        try {
+            while (offset < validBytes) {
+                // Row length 읽기 (4 bytes)
+                if (offset + 4 > validBytes) break
+
+                val buffer = ByteBuffer.wrap(pageData, offset, 4).order(ByteOrder.BIG_ENDIAN)
+                val rowLength = buffer.getInt()
+
+                if (rowLength <= 0 || offset + 4 + rowLength > validBytes) break
+
+                count++
+                offset += 4 + rowLength
+            }
+        } catch (e: Exception) {
+            // 파싱 오류 시 현재까지 카운트한 수 반환
+        }
+
+        return count
     }
 }
