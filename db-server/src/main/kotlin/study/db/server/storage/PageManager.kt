@@ -3,7 +3,8 @@ package study.db.server.storage
 import java.io.RandomAccessFile
 
 class PageManager(
-    private val file: RandomAccessFile
+    private val file: RandomAccessFile,
+    private val tableName: String = "example"  // 테이블 이름 (기본값: "example")
 ) {
     private val pages: MutableList<Page> = mutableListOf()
 
@@ -36,7 +37,7 @@ class PageManager(
             file.seek(offset.toLong())
             file.read(buf, 0, remaining)
 
-            pages.add(Page(id = i, data = buf))
+            pages.add(Page(pageId = PageId(tableName, i), data = buf))
         }
     }
 
