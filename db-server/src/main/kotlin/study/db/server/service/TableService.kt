@@ -2,6 +2,7 @@ package study.db.server.service
 
 import org.slf4j.LoggerFactory
 import study.db.common.Table
+import study.db.server.db_engine.Resolver
 import study.db.server.exception.ColumnNotFoundException
 import study.db.server.exception.TypeMismatchException
 import study.db.server.exception.UnsupportedTypeException
@@ -115,20 +116,15 @@ class TableService(
     /**
      * INSERT 데이터 검증
      *
+     * Resolver를 통해 컬럼 존재 여부 및 타입 검증 수행
+     *
      * @param table 대상 테이블
      * @param values 삽입할 데이터
      * @throws ColumnNotFoundException 정의되지 않은 컬럼
      * @throws TypeMismatchException 타입 불일치
      */
     private fun validateInsertData(table: Table, values: Map<String, String>) {
-        values.forEach { (columnName, value) ->
-            // 컬럼 존재 여부 확인
-            val expectedType = table.dataType[columnName]
-                ?: throw ColumnNotFoundException(table.tableName, columnName)
-
-            // 타입 검증
-            TypeValidator.validate(value, expectedType)
-        }
+        Resolver.validateInsertData(table, values)
     }
 
     /**
