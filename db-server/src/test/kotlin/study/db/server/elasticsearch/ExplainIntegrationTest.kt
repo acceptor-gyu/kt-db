@@ -18,7 +18,17 @@ import kotlin.test.assertFalse
  * EXPLAIN 기능 통합 테스트
  *
  * 실제 Elasticsearch와 연동하여 EXPLAIN 명령의 전체 흐름을 테스트합니다.
+ *
+ * ⚠️ 외부 의존성 필요: 이 테스트는 실행 중인 Elasticsearch가 필요합니다.
+ *
+ * 실행 방법:
+ * 1. Docker Compose로 Elasticsearch 실행: docker compose up -d elasticsearch
+ * 2. 통합 테스트 실행: ./gradlew integrationTest
+ *
+ * 기본 테스트(./gradlew test)에서는 제외됩니다.
  */
+@Tag("integration")
+@Disabled("Requires running Elasticsearch - use 'docker compose up -d elasticsearch' then './gradlew integrationTest'")
 @SpringBootTest(classes = [study.db.server.elasticsearch.InitElasticsearchIndexApp::class])
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @DisplayName("EXPLAIN Integration Test")
