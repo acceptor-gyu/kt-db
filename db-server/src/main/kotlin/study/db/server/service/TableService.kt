@@ -124,6 +124,95 @@ class TableService(
     }
 
     /**
+     * 데이터 삭제 (Thread-safe with tombstone marking)
+     *
+     * WHERE 조건에 맞는 행을 삭제합니다.
+     * - 파일 매니저가 있으면: 논리적 삭제 (deleted=true, tombstone 방식)
+     * - 파일 매니저가 없으면: 물리적 삭제 (메모리에서 행 제거)
+     *
+     * @param tableName 테이블 이름
+     * @param whereClause WHERE 조건 (null이면 전체 삭제)
+     * @return 삭제된 행 개수
+     * @throws IllegalStateException 테이블이 존재하지 않을 때
+     */
+    fun delete(tableName: String, whereClause: String?): Int {
+        // 1. 테이블 존재 여부 확인
+        val existingTable = tables[tableName]
+            ?: throw IllegalStateException("Table '$tableName' not found")
+
+        // 2. WHERE 조건 파싱 (간단한 key=value 형식)
+        val (columnName, value) = if (whereClause != null) {
+            parseSimpleWhereCondition(whereClause)
+        } else {
+            null to null
+        }
+
+        // 3. 파일 매니저 유무에 따라 다른 처리
+        return if (tableFileManager != null) {
+            // 파일 기반: 논리적 삭제 (tombstone)
+            val deletedCount = tableFileManager.deleteRows(tableName, existingTable.dataType, columnName, value)
+
+            // 메모리 테이블 업데이트 (deleted 행 제외)
+            tableFileManager.readTable(tableName)?.let { updatedTable ->
+                tables[tableName] = updatedTable
+            }
+
+            deletedCount
+        } else {
+            // 메모리 기반: 물리적 삭제 (테스트용)
+            var deletedCount = 0
+            val updated = tables.compute(tableName) { _, table ->
+                table?.let {
+                    val remainingRows = it.rows.filter { row ->
+                        // WHERE 조건 평가
+                        val shouldDelete = if (columnName == null) {
+                            true  // WHERE 절 없음 - 모든 행 삭제
+                        } else {
+                            row[columnName] == value
+                        }
+
+                        if (shouldDelete) {
+                            deletedCount++
+                            false  // 필터링하여 제거
+                        } else {
+                            true  // 유지
+                        }
+                    }
+                    it.copy(rows = remainingRows)
+                }
+            }
+            deletedCount
+        }
+    }
+
+    /**
+     * 간단한 WHERE 조건 파싱 (column=value 형식만 지원)
+     *
+     * 지원 형식:
+     * - name='Alice'
+     * - name="Bob"
+     * - id=123
+     *
+     * @param whereClause WHERE 조건 문자열
+     * @return Pair(컬럼명, 값)
+     * @throws IllegalArgumentException 잘못된 WHERE 구문
+     */
+    private fun parseSimpleWhereCondition(whereClause: String): Pair<String, String> {
+        val regex = Regex("""(\w+)\s*=\s*(?:'([^']*)'|"([^"]*)"|(\S+))""")
+        val match = regex.find(whereClause)
+            ?: throw IllegalArgumentException("Invalid WHERE clause: $whereClause")
+
+        val columnName = match.groupValues[1]
+        val value = match.groupValues[2].ifEmpty {
+            match.groupValues[3].ifEmpty {
+                match.groupValues[4]
+            }
+        }
+
+        return columnName to value
+    }
+
+    /**
      * 테이블 조회 (Thread-safe, Disk-based for full table scan)
      *
      * Full table scan: 파일에서 직접 읽어서 최신 데이터 보장
