@@ -652,4 +652,120 @@ class TableServiceTest {
             assertDoesNotThrow { tableService.insert("test", values) }
         }
     }
+
+    @Nested
+    @DisplayName("데이터 삭제 테스트")
+    inner class DeleteTest {
+
+        @BeforeEach
+        fun setupTable() {
+            tableService.createTable("users", mapOf("id" to "INT", "name" to "VARCHAR"))
+        }
+
+        @Test
+        @DisplayName("WHERE 조건에 맞는 행만 삭제")
+        fun `deletes rows matching WHERE condition`() {
+            // Given: 3개의 행 삽입
+            tableService.insert("users", mapOf("id" to "1", "name" to "Alice"))
+            tableService.insert("users", mapOf("id" to "2", "name" to "Bob"))
+            tableService.insert("users", mapOf("id" to "3", "name" to "Charlie"))
+
+            // When: id=2인 행 삭제
+            val deletedCount = tableService.delete("users", "id=2")
+
+            // Then: 1개 행 삭제됨
+            assertEquals(1, deletedCount)
+        }
+
+        @Test
+        @DisplayName("모든 행 삭제 (WHERE 절 없음)")
+        fun `deletes all rows when no WHERE clause`() {
+            // Given: 3개의 행 삽입
+            tableService.insert("users", mapOf("id" to "1", "name" to "Alice"))
+            tableService.insert("users", mapOf("id" to "2", "name" to "Bob"))
+            tableService.insert("users", mapOf("id" to "3", "name" to "Charlie"))
+
+            // When: WHERE 절 없이 삭제
+            val deletedCount = tableService.delete("users", null)
+
+            // Then: 3개 행 삭제됨
+            assertEquals(3, deletedCount)
+        }
+
+        @Test
+        @DisplayName("삭제된 행 개수 반환")
+        fun `returns count of deleted rows`() {
+            // Given: 여러 행 삽입
+            tableService.insert("users", mapOf("id" to "1", "name" to "Alice"))
+            tableService.insert("users", mapOf("id" to "2", "name" to "Bob"))
+
+            // When: 삭제
+            val deletedCount = tableService.delete("users", "name='Alice'")
+
+            // Then: 삭제된 행 개수 반환
+            assertEquals(1, deletedCount)
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 테이블 삭제 시 예외")
+        fun `throws exception when table does not exist`() {
+            // When & Then: 존재하지 않는 테이블 삭제 시 예외
+            assertThrows<IllegalStateException> {
+                tableService.delete("nonexistent", null)
+            }
+        }
+
+        @Test
+        @DisplayName("조건에 맞는 행이 없으면 0 반환")
+        fun `returns zero when no rows match condition`() {
+            // Given: 행 삽입
+            tableService.insert("users", mapOf("id" to "1", "name" to "Alice"))
+
+            // When: 조건에 맞지 않는 행 삭제
+            val deletedCount = tableService.delete("users", "id=999")
+
+            // Then: 0 반환
+            assertEquals(0, deletedCount)
+        }
+
+        @Test
+        @DisplayName("잘못된 WHERE 구문 시 예외")
+        fun `throws exception for invalid WHERE clause`() {
+            // When & Then: 잘못된 WHERE 구문
+            assertThrows<IllegalArgumentException> {
+                tableService.delete("users", "invalid syntax here")
+            }
+        }
+
+        @Test
+        @DisplayName("작은따옴표와 큰따옴표 모두 지원")
+        fun `supports both single and double quotes in WHERE`() {
+            // Given: 데이터 삽입
+            tableService.insert("users", mapOf("id" to "1", "name" to "Alice"))
+            tableService.insert("users", mapOf("id" to "2", "name" to "Bob"))
+
+            // When: 작은따옴표로 삭제
+            val count1 = tableService.delete("users", "name='Alice'")
+            // When: 큰따옴표로 삭제
+            val count2 = tableService.delete("users", "name=\"Bob\"")
+
+            // Then: 둘 다 성공
+            assertEquals(1, count1)
+            assertEquals(1, count2)
+        }
+
+        @Test
+        @DisplayName("따옴표 없는 값도 지원 (숫자)")
+        fun `supports values without quotes for numbers`() {
+            // Given: 데이터 삽입
+            tableService.insert("users", mapOf("id" to "1", "name" to "Alice"))
+            tableService.insert("users", mapOf("id" to "2", "name" to "Bob"))
+
+            // When: 따옴표 없이 삭제
+            val deletedCount = tableService.delete("users", "id=1")
+
+            // Then: 성공
+            assertEquals(1, deletedCount)
+        }
+    }
 }
