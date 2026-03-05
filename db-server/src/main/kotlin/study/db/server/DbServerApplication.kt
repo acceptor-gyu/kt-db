@@ -35,38 +35,56 @@ class DbServerApplication {
     }
 
     /**
+     * BufferPool 빈 생성
+     * 16KB * 1024 = 16MB 캐시
+     */
+    @Bean
+    fun bufferPool(): BufferPool {
+        return BufferPool(maxPages = 1024)
+    }
+
+    /**
      * TableFileManager 빈 생성
      * application.properties의 db.storage.directory 설정 사용
      */
     @Bean
     fun tableFileManager(
         @Value("\${db.storage.directory:./data}") storageDirectory: String,
-        rowEncoder: RowEncoder
+        rowEncoder: RowEncoder,
+        bufferPool: BufferPool
     ): TableFileManager {
         val dataDir = File(storageDirectory)
-        return TableFileManager(dataDir, rowEncoder)
+        return TableFileManager(dataDir, rowEncoder, bufferPool)
     }
 
     /**
      * TableService 빈 생성
      * TableFileManager를 사용하여 파일 기반 persistence 지원
+     *
+     * Note: VacuumService는 setter injection으로 나중에 주입됨 (circular dependency 방지)
      */
     @Bean
     fun tableService(tableFileManager: TableFileManager): TableService {
-        return TableService(tableFileManager)
+        return TableService(tableFileManager, null)
     }
 
     @Bean
     fun tcpServerRunner(
         explainService: ExplainService,
         tableService: TableService,
+        vacuumScheduler: study.db.server.vacuum.VacuumScheduler,
+        vacuumService: study.db.server.vacuum.VacuumService,
         @Value("\${db.server.port:9000}") port: Int
     ): CommandLineRunner {
         return CommandLineRunner {
+            // Circular dependency 해결: TableService에 VacuumService 설정
+            tableService.setVacuumService(vacuumService)
+
             val tcpServer = DbTcpServer(
                 port = port,
                 explainService = explainService,
-                tableService = tableService
+                tableService = tableService,
+                vacuumScheduler = vacuumScheduler
             )
 
             Runtime.getRuntime().addShutdownHook(Thread {

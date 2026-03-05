@@ -16,7 +16,8 @@ import java.util.concurrent.ConcurrentHashMap
  * @param tableFileManager 파일 기반 persistence 관리자 (optional)
  */
 class TableService(
-    private val tableFileManager: TableFileManager? = null
+    private val tableFileManager: TableFileManager? = null,
+    private var vacuumService: study.db.server.vacuum.VacuumService? = null
 ) {
     private val logger = LoggerFactory.getLogger(TableService::class.java)
 
@@ -271,5 +272,39 @@ class TableService(
             "${it.key} ${it.value}"
         }
         return "CREATE TABLE ${table.tableName} ($columnsDefinition)"
+    }
+
+    /**
+     * VACUUM 실행 (삭제된 행 물리적 제거)
+     *
+     * @param tableName 테이블 이름
+     * @return VacuumStats 통계 객체
+     */
+    fun vacuum(tableName: String): study.db.common.VacuumStats {
+        if (!tableExists(tableName)) {
+            return study.db.common.VacuumStats.failure("Table '$tableName' not found")
+        }
+
+        if (vacuumService == null) {
+            return study.db.common.VacuumStats.failure("VACUUM service is not available")
+        }
+
+        val stats = vacuumService!!.vacuumTable(tableName)
+
+        // VACUUM 성공 시 메모리 테이블 업데이트
+        if (stats.success) {
+            tableFileManager?.readTable(tableName)?.let { updatedTable ->
+                tables[tableName] = updatedTable
+            }
+        }
+
+        return stats
+    }
+
+    /**
+     * VacuumService 설정 (Setter injection for circular dependency)
+     */
+    fun setVacuumService(service: study.db.server.vacuum.VacuumService) {
+        this.vacuumService = service
     }
 }

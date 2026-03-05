@@ -317,6 +317,7 @@ class ConnectionHandler(
             trimmedSql.startsWith("SELECT", ignoreCase = true) -> parseAndHandleSelect(trimmedSql)
             trimmedSql.startsWith("DELETE", ignoreCase = true) -> parseAndHandleDelete(trimmedSql)
             trimmedSql.startsWith("DROP TABLE", ignoreCase = true) -> parseAndHandleDropTable(trimmedSql)
+            trimmedSql.startsWith("VACUUM", ignoreCase = true) -> parseAndHandleVacuum(trimmedSql)
             trimmedSql.startsWith("EXPLAIN", ignoreCase = true) -> parseAndHandleExplain(trimmedSql)
             else -> DbResponse(success = false, message = "Unsupported SQL query: $sql", errorCode = 400)
         }
@@ -475,6 +476,42 @@ class ConnectionHandler(
                 message = "Query plan generated successfully",
                 data = queryPlanJson
             )
+        }
+    }
+
+    /**
+     * VACUUM 명령 파싱 및 처리
+     *
+     * 문법: VACUUM <table_name>
+     *
+     * 예: VACUUM users
+     */
+    private fun parseAndHandleVacuum(sql: String): DbResponse {
+        val regex = Regex("""VACUUM\s+(\w+)""", RegexOption.IGNORE_CASE)
+        val match = regex.find(sql)
+            ?: return DbResponse(success = false, message = "Invalid VACUUM syntax: $sql", errorCode = 400)
+
+        val tableName = match.groupValues[1]
+
+        return ExceptionMapper.executeWithExceptionHandling(connectionId) {
+            val stats = tableService.vacuum(tableName)
+
+            if (stats.success) {
+                // 성공 시 상세 통계 반환
+                val statsJson = objectMapper.writeValueAsString(stats)
+                DbResponse(
+                    success = true,
+                    message = stats.toSummary(),
+                    data = statsJson
+                )
+            } else {
+                // 실패 시 에러 메시지 반환
+                DbResponse(
+                    success = false,
+                    message = "VACUUM failed: ${stats.errorMessage}",
+                    errorCode = 500
+                )
+            }
         }
     }
 }

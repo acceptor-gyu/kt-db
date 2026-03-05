@@ -618,4 +618,200 @@ class TableFileManager(
 
         return deletedCount
     }
+
+    /**
+     * 테이블 통계 정보 조회
+     *
+     * VACUUM 실행 여부를 판단하기 위한 통계를 계산합니다.
+     *
+     * @param tableName 테이블 이름
+     * @return TableStatistics 객체 또는 null (파일 없음)
+     */
+    fun getTableStatistics(tableName: String): TableStatistics? {
+        val file = File(dataDirectory, "$tableName.dat")
+        if (!file.exists()) return null
+
+        try {
+            val (schema, allRows) = readTableWithRows(tableName) ?: return null
+
+            val totalRows = allRows.size
+            val deletedRows = allRows.count { it.deleted }
+            val activeRows = totalRows - deletedRows
+            val deletedRatio = if (totalRows > 0) deletedRows.toDouble() / totalRows else 0.0
+
+            return TableStatistics(
+                tableName = tableName,
+                totalRows = totalRows,
+                activeRows = activeRows,
+                deletedRows = deletedRows,
+                deletedRatio = deletedRatio,
+                fileSizeBytes = file.length(),
+                pageCount = getPageCount(tableName)
+            )
+        } catch (e: Exception) {
+            logger.error("Failed to get statistics for table: $tableName", e)
+            return null
+        }
+    }
+
+    /**
+     * 테이블 압축 (VACUUM) - Copy-on-Write 방식
+     *
+     * 삭제된 행(tombstone)을 물리적으로 제거하여 디스크 공간을 회수합니다.
+     *
+     * 알고리즘:
+     * 1. 파일 수정 시간 기록 (T1)
+     * 2. 활성 행만 새 파일(.vacuum)에 복사
+     * 3. 파일 수정 시간 재확인 (T2)
+     * 4. T1 == T2면 atomic file swap, 아니면 abort
+     *
+     * @param tableName 테이블 이름
+     * @return VacuumStats 통계 객체
+     */
+    fun compactTable(tableName: String): study.db.common.VacuumStats {
+        val file = File(dataDirectory, "$tableName.dat")
+        if (!file.exists()) {
+            return study.db.common.VacuumStats.failure("Table file not found: $tableName")
+        }
+
+        val startTime = java.time.Instant.now()
+        val vacuumFile = File(dataDirectory, "$tableName.dat.vacuum")
+
+        try {
+            // PHASE 1: SNAPSHOT - 파일 수정 시간 기록
+            val initialModifiedTime = file.lastModified()
+            val statsBefore = getTableStatistics(tableName)
+                ?: return study.db.common.VacuumStats.failure("Failed to get table statistics")
+
+            if (statsBefore.deletedRows == 0) {
+                return study.db.common.VacuumStats.notNeeded()
+            }
+
+            // PHASE 2: COPY - 활성 행만 새 파일에 복사
+            val (schema, allRows) = readTableWithRows(tableName)
+                ?: return study.db.common.VacuumStats.failure("Failed to read table")
+
+            val activeRows = allRows.filter { !it.deleted }
+
+            RandomAccessFile(vacuumFile, "rw").use { raf ->
+                // Write header
+                val buffer = java.nio.ByteBuffer.allocate(24).order(java.nio.ByteOrder.BIG_ENDIAN)
+                buffer.putShort(0xDBF0.toShort())  // Magic number
+                buffer.putShort(1)  // Version
+                buffer.putLong(activeRows.size.toLong())  // Row count (only active rows)
+                buffer.putInt(schema.size)  // Column count
+
+                val schemaLength = schema.entries.sumOf { (name, _) ->
+                    2 + name.toByteArray(Charsets.UTF_8).size + 1
+                }
+                buffer.putInt(schemaLength)
+                buffer.putInt(0)  // Reserved
+
+                raf.write(buffer.array())
+
+                // Write schema
+                writeSchema(raf, schema)
+
+                // Write only active rows
+                activeRows.forEach { row ->
+                    val rowBytes = rowEncoder.encodeRow(row, schema)
+                    raf.write(rowBytes)
+                }
+
+                raf.fd.sync()
+            }
+
+            // PHASE 3: VERIFICATION - 쓰기 감지 확인
+            val finalModifiedTime = file.lastModified()
+            if (initialModifiedTime != finalModifiedTime) {
+                vacuumFile.delete()
+                return study.db.common.VacuumStats.failure(
+                    errorMessage = "Concurrent write detected, VACUUM aborted",
+                    abortedDueToWrite = true
+                )
+            }
+
+            // PHASE 4: FILE SWAP - Atomic rename
+            val oldFile = File(dataDirectory, "$tableName.dat.old")
+
+            // Atomic file swap
+            if (!file.renameTo(oldFile)) {
+                vacuumFile.delete()
+                return study.db.common.VacuumStats.failure("Failed to rename original file")
+            }
+
+            if (!vacuumFile.renameTo(file)) {
+                oldFile.renameTo(file)  // Rollback
+                vacuumFile.delete()
+                return study.db.common.VacuumStats.failure("Failed to rename vacuum file")
+            }
+
+            oldFile.delete()
+
+            // BufferPool 무효화
+            try {
+                bufferPool?.invalidateTable(tableName)
+            } catch (e: Exception) {
+                logger.warn("Failed to invalidate BufferPool for table: $tableName", e)
+            }
+
+            // 통계 수집
+            val statsAfter = getTableStatistics(tableName)
+                ?: return study.db.common.VacuumStats.failure("Failed to get final statistics")
+
+            val endTime = java.time.Instant.now()
+            val durationMs = java.time.Duration.between(startTime, endTime).toMillis()
+
+            val diskSpaceSaved = statsBefore.fileSizeBytes - statsAfter.fileSizeBytes
+            val reductionPercent = if (statsBefore.fileSizeBytes > 0) {
+                (diskSpaceSaved.toDouble() / statsBefore.fileSizeBytes) * 100.0
+            } else 0.0
+
+            return study.db.common.VacuumStats(
+                totalRowsBefore = statsBefore.totalRows,
+                activeRows = statsAfter.activeRows,
+                deletedRowsRemoved = statsBefore.deletedRows,
+                diskSpaceBefore = statsBefore.fileSizeBytes,
+                diskSpaceAfter = statsAfter.fileSizeBytes,
+                diskSpaceSaved = diskSpaceSaved,
+                reductionPercent = reductionPercent,
+                pagesBefore = statsBefore.pageCount,
+                pagesAfter = statsAfter.pageCount,
+                pagesFreed = statsBefore.pageCount - statsAfter.pageCount,
+                startTime = startTime,
+                endTime = endTime,
+                durationMs = durationMs,
+                success = true
+            )
+
+        } catch (e: Exception) {
+            vacuumFile.delete()
+            logger.error("VACUUM failed for table: $tableName", e)
+            return study.db.common.VacuumStats.failure("VACUUM error: ${e.message}")
+        }
+    }
+
+    /**
+     * 파일 수정 시간 조회 (쓰기 감지용)
+     *
+     * @param tableName 테이블 이름
+     * @return 파일 수정 시간 (epoch ms) 또는 null
+     */
+    fun getFileModifiedTime(tableName: String): Long? {
+        val file = File(dataDirectory, "$tableName.dat")
+        return if (file.exists()) file.lastModified() else null
+    }
 }
+
+/**
+ * 테이블 통계 데이터 클래스
+ */
+data class TableStatistics(
+    val tableName: String,
+    val totalRows: Int,
+    val activeRows: Int,
+    val deletedRows: Int,
+    val deletedRatio: Double,
+    val fileSizeBytes: Long,
+    val pageCount: Int
+)
