@@ -139,6 +139,32 @@ class TableController(
         }
     }
 
+    // e.g. POST /api/tables/delete
+    // Body: { "query": "DELETE FROM users WHERE id=1" }
+    @PostMapping("/delete")
+    fun deleteRows(@RequestBody request: SqlQueryRequest): ResponseEntity<Map<String, Any>> {
+        return try {
+            val response = dbClient.send(request.query)
+
+            if (response.success) {
+                ResponseEntity.ok(mapOf(
+                    "success" to true,
+                    "message" to (response.message ?: "Rows deleted")
+                ))
+            } else {
+                ResponseEntity.badRequest().body(mapOf(
+                    "success" to false,
+                    "message" to (response.message ?: "Failed to delete rows")
+                ))
+            }
+        } catch (e: Exception) {
+            ResponseEntity.badRequest().body(mapOf(
+                "success" to false,
+                "message" to "Failed to execute query: ${e.message}"
+            ))
+        }
+    }
+
     @GetMapping("/ping")
     fun ping(): ResponseEntity<Map<String, Any>> {
         return try {

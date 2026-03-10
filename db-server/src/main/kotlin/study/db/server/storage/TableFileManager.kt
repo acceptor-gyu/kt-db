@@ -2,6 +2,8 @@ package study.db.server.storage
 
 import org.slf4j.LoggerFactory
 import study.db.common.Table
+import study.db.common.where.WhereClause
+import study.db.common.where.WhereEvaluator
 import study.db.server.exception.UnsupportedTypeException
 import java.io.File
 import java.io.IOException
@@ -575,14 +577,14 @@ class TableFileManager(
      * 조건에 맞는 행을 삭제 (Tombstone 방식)
      *
      * WHERE 조건에 맞는 행의 deleted 플래그를 true로 설정합니다.
+     * WhereEvaluator를 사용하여 타입 기반 비교를 지원합니다.
      *
      * @param tableName 테이블 이름
      * @param schema 테이블 스키마
-     * @param columnName WHERE 조건 컬럼명 (null이면 전체 삭제)
-     * @param value WHERE 조건 값
+     * @param whereClause WHERE 조건 (WhereClause.None이면 전체 삭제)
      * @return 삭제된 행 개수
      */
-    fun deleteRows(tableName: String, schema: Map<String, String>, columnName: String?, value: String?): Int {
+    fun deleteRows(tableName: String, schema: Map<String, String>, whereClause: WhereClause): Int {
         // 1. 모든 Row 읽기 (deleted 포함)
         val (_, allRows) = readTableWithRows(tableName)
             ?: return 0
@@ -594,12 +596,8 @@ class TableFileManager(
             if (row.deleted) {
                 row
             } else {
-                // WHERE 조건 평가
-                val shouldDelete = if (columnName == null) {
-                    true  // WHERE 절 없음 - 모든 활성 행 삭제
-                } else {
-                    row.data[columnName] == value
-                }
+                // WhereEvaluator를 사용하여 조건 평가
+                val shouldDelete = WhereEvaluator.matches(row, whereClause, schema)
 
                 if (shouldDelete) {
                     deletedCount++

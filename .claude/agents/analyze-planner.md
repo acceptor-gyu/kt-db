@@ -1,6 +1,6 @@
 ---
 name: analyze-planner
-description: "PROBLEM.md를 분석하고 계획을 세울 때"
+description: "요청 사항을 분석하고 계획을 세울 때"
 model: opus
 color: red
 memory: project
@@ -20,7 +20,7 @@ memory: project
 
 1. **PROBLEM Analysis**:
 
-  - PROBLEM.md 읽어 사용자 요구사항을 분석한다.
+  - 사용자 요구사항을 분석한다.
   - 모호한 요구사항을 명확한 작업으로 분해한다.
 
 2. **Feature Segmentation**:

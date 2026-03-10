@@ -1,8 +1,12 @@
 package study.db.server.service
 
 import org.slf4j.LoggerFactory
+import study.db.common.Row
 import study.db.common.Table
+import study.db.common.where.WhereClause
+import study.db.common.where.WhereEvaluator
 import study.db.server.db_engine.Resolver
+import study.db.server.exception.ColumnNotFoundException
 import study.db.server.storage.TableFileManager
 import java.util.concurrent.ConcurrentHashMap
 
@@ -132,26 +136,26 @@ class TableService(
      * - 파일 매니저가 없으면: 물리적 삭제 (메모리에서 행 제거)
      *
      * @param tableName 테이블 이름
-     * @param whereClause WHERE 조건 (null이면 전체 삭제)
+     * @param whereString WHERE 조건 문자열 (null이면 전체 삭제)
      * @return 삭제된 행 개수
      * @throws IllegalStateException 테이블이 존재하지 않을 때
+     * @throws ColumnNotFoundException WHERE 조건에 존재하지 않는 컬럼이 사용됐을 때
      */
-    fun delete(tableName: String, whereClause: String?): Int {
+    fun delete(tableName: String, whereString: String?): Int {
         // 1. 테이블 존재 여부 확인
         val existingTable = tables[tableName]
             ?: throw IllegalStateException("Table '$tableName' not found")
 
-        // 2. WHERE 조건 파싱 (간단한 key=value 형식)
-        val (columnName, value) = if (whereClause != null) {
-            parseSimpleWhereCondition(whereClause)
-        } else {
-            null to null
-        }
+        // 2. WHERE 조건 파싱 (WhereClause 기반)
+        val whereClause = WhereClause.parse(whereString)
 
-        // 3. 파일 매니저 유무에 따라 다른 처리
+        // 3. WHERE 조건 컬럼 존재 검증
+        validateWhereColumns(existingTable, whereClause)
+
+        // 4. 파일 매니저 유무에 따라 다른 처리
         return if (tableFileManager != null) {
             // 파일 기반: 논리적 삭제 (tombstone)
-            val deletedCount = tableFileManager.deleteRows(tableName, existingTable.dataType, columnName, value)
+            val deletedCount = tableFileManager.deleteRows(tableName, existingTable.dataType, whereClause)
 
             // 메모리 테이블 업데이트 (deleted 행 제외)
             tableFileManager.readTable(tableName)?.let { updatedTable ->
@@ -162,15 +166,11 @@ class TableService(
         } else {
             // 메모리 기반: 물리적 삭제 (테스트용)
             var deletedCount = 0
-            val updated = tables.compute(tableName) { _, table ->
+            tables.compute(tableName) { _, table ->
                 table?.let {
                     val remainingRows = it.rows.filter { row ->
-                        // WHERE 조건 평가
-                        val shouldDelete = if (columnName == null) {
-                            true  // WHERE 절 없음 - 모든 행 삭제
-                        } else {
-                            row[columnName] == value
-                        }
+                        val rowObj = Row(data = row)
+                        val shouldDelete = WhereEvaluator.matches(rowObj, whereClause, it.dataType)
 
                         if (shouldDelete) {
                             deletedCount++
@@ -187,30 +187,19 @@ class TableService(
     }
 
     /**
-     * 간단한 WHERE 조건 파싱 (column=value 형식만 지원)
+     * WHERE 조건에 사용된 컬럼이 테이블에 존재하는지 검증
      *
-     * 지원 형식:
-     * - name='Alice'
-     * - name="Bob"
-     * - id=123
-     *
-     * @param whereClause WHERE 조건 문자열
-     * @return Pair(컬럼명, 값)
-     * @throws IllegalArgumentException 잘못된 WHERE 구문
+     * @param table 대상 테이블
+     * @param whereClause WHERE 조건
+     * @throws ColumnNotFoundException 존재하지 않는 컬럼이 사용됐을 때
      */
-    private fun parseSimpleWhereCondition(whereClause: String): Pair<String, String> {
-        val regex = Regex("""(\w+)\s*=\s*(?:'([^']*)'|"([^"]*)"|(\S+))""")
-        val match = regex.find(whereClause)
-            ?: throw IllegalArgumentException("Invalid WHERE clause: $whereClause")
-
-        val columnName = match.groupValues[1]
-        val value = match.groupValues[2].ifEmpty {
-            match.groupValues[3].ifEmpty {
-                match.groupValues[4]
+    private fun validateWhereColumns(table: Table, whereClause: WhereClause) {
+        val columnNames = whereClause.getColumnNames()
+        for (columnName in columnNames) {
+            if (!table.dataType.containsKey(columnName)) {
+                throw ColumnNotFoundException(table.tableName, columnName)
             }
         }
-
-        return columnName to value
     }
 
     /**
