@@ -652,4 +652,266 @@ class TableServiceTest {
             assertDoesNotThrow { tableService.insert("test", values) }
         }
     }
+
+    @Nested
+    @DisplayName("데이터 삭제 테스트")
+    inner class DeleteTest {
+
+        @BeforeEach
+        fun setupTable() {
+            tableService.createTable("users", mapOf("id" to "INT", "name" to "VARCHAR"))
+        }
+
+        @Test
+        @DisplayName("WHERE 조건에 맞는 행만 삭제")
+        fun `deletes rows matching WHERE condition`() {
+            // Given: 3개의 행 삽입
+            tableService.insert("users", mapOf("id" to "1", "name" to "Alice"))
+            tableService.insert("users", mapOf("id" to "2", "name" to "Bob"))
+            tableService.insert("users", mapOf("id" to "3", "name" to "Charlie"))
+
+            // When: id=2인 행 삭제
+            val deletedCount = tableService.delete("users", "id=2")
+
+            // Then: 1개 행 삭제됨
+            assertEquals(1, deletedCount)
+        }
+
+        @Test
+        @DisplayName("모든 행 삭제 (WHERE 절 없음)")
+        fun `deletes all rows when no WHERE clause`() {
+            // Given: 3개의 행 삽입
+            tableService.insert("users", mapOf("id" to "1", "name" to "Alice"))
+            tableService.insert("users", mapOf("id" to "2", "name" to "Bob"))
+            tableService.insert("users", mapOf("id" to "3", "name" to "Charlie"))
+
+            // When: WHERE 절 없이 삭제
+            val deletedCount = tableService.delete("users", null)
+
+            // Then: 3개 행 삭제됨
+            assertEquals(3, deletedCount)
+        }
+
+        @Test
+        @DisplayName("삭제된 행 개수 반환")
+        fun `returns count of deleted rows`() {
+            // Given: 여러 행 삽입
+            tableService.insert("users", mapOf("id" to "1", "name" to "Alice"))
+            tableService.insert("users", mapOf("id" to "2", "name" to "Bob"))
+
+            // When: 삭제
+            val deletedCount = tableService.delete("users", "name='Alice'")
+
+            // Then: 삭제된 행 개수 반환
+            assertEquals(1, deletedCount)
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 테이블 삭제 시 예외")
+        fun `throws exception when table does not exist`() {
+            // When & Then: 존재하지 않는 테이블 삭제 시 예외
+            assertThrows<IllegalStateException> {
+                tableService.delete("nonexistent", null)
+            }
+        }
+
+        @Test
+        @DisplayName("조건에 맞는 행이 없으면 0 반환")
+        fun `returns zero when no rows match condition`() {
+            // Given: 행 삽입
+            tableService.insert("users", mapOf("id" to "1", "name" to "Alice"))
+
+            // When: 조건에 맞지 않는 행 삭제
+            val deletedCount = tableService.delete("users", "id=999")
+
+            // Then: 0 반환
+            assertEquals(0, deletedCount)
+        }
+
+        @Test
+        @DisplayName("잘못된 WHERE 구문 시 예외")
+        fun `throws exception for invalid WHERE clause`() {
+            // When & Then: 잘못된 WHERE 구문
+            assertThrows<IllegalArgumentException> {
+                tableService.delete("users", "invalid syntax here")
+            }
+        }
+
+        @Test
+        @DisplayName("작은따옴표와 큰따옴표 모두 지원")
+        fun `supports both single and double quotes in WHERE`() {
+            // Given: 데이터 삽입
+            tableService.insert("users", mapOf("id" to "1", "name" to "Alice"))
+            tableService.insert("users", mapOf("id" to "2", "name" to "Bob"))
+
+            // When: 작은따옴표로 삭제
+            val count1 = tableService.delete("users", "name='Alice'")
+            // When: 큰따옴표로 삭제
+            val count2 = tableService.delete("users", "name=\"Bob\"")
+
+            // Then: 둘 다 성공
+            assertEquals(1, count1)
+            assertEquals(1, count2)
+        }
+
+        @Test
+        @DisplayName("따옴표 없는 값도 지원 (숫자)")
+        fun `supports values without quotes for numbers`() {
+            // Given: 데이터 삽입
+            tableService.insert("users", mapOf("id" to "1", "name" to "Alice"))
+            tableService.insert("users", mapOf("id" to "2", "name" to "Bob"))
+
+            // When: 따옴표 없이 삭제
+            val deletedCount = tableService.delete("users", "id=1")
+
+            // Then: 성공
+            assertEquals(1, deletedCount)
+        }
+    }
+
+    @Nested
+    @DisplayName("복합 WHERE 조건 DELETE 테스트")
+    inner class ComplexWhereDeleteTest {
+
+        @BeforeEach
+        fun setupTable() {
+            tableService.createTable("users", mapOf("id" to "INT", "name" to "VARCHAR", "age" to "INT"))
+            tableService.insert("users", mapOf("id" to "1", "name" to "Alice", "age" to "30"))
+            tableService.insert("users", mapOf("id" to "2", "name" to "Bob", "age" to "25"))
+            tableService.insert("users", mapOf("id" to "3", "name" to "Charlie", "age" to "35"))
+        }
+
+        @Test
+        @DisplayName("AND 조건 DELETE - 두 조건 모두 만족하는 행만 삭제")
+        fun `deletes rows matching AND condition`() {
+            // When: age > 28 AND name='Alice'
+            val deletedCount = tableService.delete("users", "age > 28 AND name='Alice'")
+
+            // Then: Alice만 삭제
+            assertEquals(1, deletedCount)
+            val result = tableService.select("users")
+            assertEquals(2, result?.rows?.size)
+            assertTrue(result?.rows?.any { it["name"] == "Bob" } ?: false)
+            assertTrue(result?.rows?.any { it["name"] == "Charlie" } ?: false)
+        }
+
+        @Test
+        @DisplayName("OR 조건 DELETE - 하나라도 만족하는 행 삭제")
+        fun `deletes rows matching OR condition`() {
+            // When: id=1 OR id=3
+            val deletedCount = tableService.delete("users", "id=1 OR id=3")
+
+            // Then: Alice, Charlie 삭제, Bob만 유지
+            assertEquals(2, deletedCount)
+            val result = tableService.select("users")
+            assertEquals(1, result?.rows?.size)
+            assertEquals("Bob", result?.rows?.first()?.get("name"))
+        }
+
+        @Test
+        @DisplayName("비교 연산자 > DELETE")
+        fun `deletes rows with greater than operator`() {
+            // When: id > 2
+            val deletedCount = tableService.delete("users", "id > 2")
+
+            // Then: id=3만 삭제
+            assertEquals(1, deletedCount)
+        }
+
+        @Test
+        @DisplayName("비교 연산자 < DELETE")
+        fun `deletes rows with less than operator`() {
+            // When: id < 2
+            val deletedCount = tableService.delete("users", "id < 2")
+
+            // Then: id=1만 삭제
+            assertEquals(1, deletedCount)
+        }
+
+        @Test
+        @DisplayName("비교 연산자 >= DELETE")
+        fun `deletes rows with greater than or equal operator`() {
+            // When: id >= 2
+            val deletedCount = tableService.delete("users", "id >= 2")
+
+            // Then: id=2, 3 삭제
+            assertEquals(2, deletedCount)
+        }
+
+        @Test
+        @DisplayName("비교 연산자 <= DELETE")
+        fun `deletes rows with less than or equal operator`() {
+            // When: id <= 2
+            val deletedCount = tableService.delete("users", "id <= 2")
+
+            // Then: id=1, 2 삭제
+            assertEquals(2, deletedCount)
+        }
+
+        @Test
+        @DisplayName("비교 연산자 != DELETE")
+        fun `deletes rows with not equal operator`() {
+            // When: name != 'Alice'
+            val deletedCount = tableService.delete("users", "name != 'Alice'")
+
+            // Then: Bob, Charlie 삭제
+            assertEquals(2, deletedCount)
+            val result = tableService.select("users")
+            assertEquals(1, result?.rows?.size)
+            assertEquals("Alice", result?.rows?.first()?.get("name"))
+        }
+
+        @Test
+        @DisplayName("INT 타입 숫자 비교 DELETE")
+        fun `deletes rows with numeric comparison for INT type`() {
+            // Given: age가 3, 25, 100인 데이터로 재구성
+            tableService.dropTable("users")
+            tableService.createTable("users", mapOf("id" to "INT", "name" to "VARCHAR", "age" to "INT"))
+            tableService.insert("users", mapOf("id" to "1", "name" to "Alice", "age" to "3"))
+            tableService.insert("users", mapOf("id" to "2", "name" to "Bob", "age" to "25"))
+            tableService.insert("users", mapOf("id" to "3", "name" to "Charlie", "age" to "100"))
+
+            // When: age > 25 (INT 비교이므로 3 < 25, 문자열이면 "3" > "25")
+            val deletedCount = tableService.delete("users", "age > 25")
+
+            // Then: Charlie만 삭제 (INT 비교 기준)
+            assertEquals(1, deletedCount)
+            val result = tableService.select("users")
+            assertEquals(2, result?.rows?.size)
+            assertTrue(result?.rows?.any { it["name"] == "Alice" } ?: false)
+            assertTrue(result?.rows?.any { it["name"] == "Bob" } ?: false)
+        }
+
+        @Test
+        @DisplayName("VARCHAR 타입 문자열 비교 DELETE")
+        fun `deletes rows with string comparison for VARCHAR type`() {
+            // When: name > 'B' (사전순 비교)
+            val deletedCount = tableService.delete("users", "name > 'B'")
+
+            // Then: Bob, Charlie 삭제 (사전순으로 "Bob" > "B", "Charlie" > "B")
+            assertEquals(2, deletedCount)
+            val result = tableService.select("users")
+            assertEquals(1, result?.rows?.size)
+            assertEquals("Alice", result?.rows?.first()?.get("name"))
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 컬럼 WHERE 조건 시 예외")
+        fun `throws exception for non-existent column in WHERE`() {
+            // When & Then: 존재하지 않는 컬럼으로 삭제 시도
+            assertThrows<ColumnNotFoundException> {
+                tableService.delete("users", "email='test'")
+            }
+        }
+
+        @Test
+        @DisplayName("AND 조건으로 매칭되는 행이 없을 때 0 반환")
+        fun `returns zero when no rows match AND condition`() {
+            // When: id=1이면서 name=Bob인 행 없음
+            val deletedCount = tableService.delete("users", "id=1 AND name='Bob'")
+
+            // Then: 0 반환
+            assertEquals(0, deletedCount)
+        }
+    }
 }

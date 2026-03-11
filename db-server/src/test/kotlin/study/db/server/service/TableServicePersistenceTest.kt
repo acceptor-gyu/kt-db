@@ -4,6 +4,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import study.db.server.storage.*
 import java.io.File
@@ -254,5 +255,128 @@ class TableServicePersistenceTest {
 
         // 파일이 생성되지 않아야 함
         assertFalse(File(tempDir, "temp.dat").exists())
+    }
+
+    @Nested
+    @DisplayName("파일 기반 DELETE 테스트")
+    inner class DeletePersistenceTest {
+
+        @BeforeEach
+        fun setupTable() {
+            tableService.createTable("users", mapOf("id" to "INT", "name" to "VARCHAR"))
+            tableService.insert("users", mapOf("id" to "1", "name" to "Alice"))
+            tableService.insert("users", mapOf("id" to "2", "name" to "Bob"))
+            tableService.insert("users", mapOf("id" to "3", "name" to "Charlie"))
+        }
+
+        @Test
+        @DisplayName("DELETE 후 SELECT 시 삭제된 행이 보이지 않음")
+        fun `deleted rows are not visible in SELECT`() {
+            // When: id=2인 행 삭제
+            tableService.delete("users", "id=2")
+
+            // Then: SELECT 결과에서 Bob이 없음
+            val result = tableService.select("users")
+            assertEquals(2, result?.rows?.size)
+            assertTrue(result?.rows?.none { it["name"] == "Bob" } ?: false)
+            assertTrue(result?.rows?.any { it["name"] == "Alice" } ?: false)
+            assertTrue(result?.rows?.any { it["name"] == "Charlie" } ?: false)
+        }
+
+        @Test
+        @DisplayName("DELETE 후 파일에서 직접 읽어도 삭제된 행이 보이지 않음")
+        fun `deleted rows are not visible when reading file directly`() {
+            // When: Bob 삭제
+            tableService.delete("users", "name='Bob'")
+
+            // Then: 파일에서 직접 읽어도 삭제된 행이 필터링됨
+            val loaded = tableFileManager.readTable("users")
+            assertEquals(2, loaded?.rows?.size)
+            assertTrue(loaded?.rows?.none { it["name"] == "Bob" } ?: false)
+        }
+
+        @Test
+        @DisplayName("DELETE 후 파일 내 tombstone 행이 존재함")
+        fun `tombstone rows exist in file after delete`() {
+            // When: id=1 삭제
+            tableService.delete("users", "id=1")
+
+            // Then: 통계에서 deletedRows > 0 확인
+            val stats = tableFileManager.getTableStatistics("users")
+            assertNotNull(stats)
+            assertEquals(3, stats!!.totalRows)
+            assertEquals(1, stats.deletedRows)
+            assertEquals(2, stats.activeRows)
+        }
+
+        @Test
+        @DisplayName("DELETE 후 재INSERT 시 정상 동작")
+        fun `insert after delete works correctly`() {
+            // Given: id=1 삭제
+            tableService.delete("users", "id=1")
+
+            // When: 동일 id로 새 데이터 삽입
+            tableService.insert("users", mapOf("id" to "1", "name" to "Alice_new"))
+
+            // Then: 새 데이터만 보임
+            val result = tableService.select("users")
+            assertEquals(3, result?.rows?.size)
+            assertTrue(result?.rows?.any { it["name"] == "Alice_new" } ?: false)
+            assertTrue(result?.rows?.none { it["name"] == "Alice" } ?: false)
+        }
+
+        @Test
+        @DisplayName("DELETE 후 서버 재시작 시 삭제 상태 유지")
+        fun `delete persists after server restart`() {
+            // Given: id=2 삭제
+            tableService.delete("users", "id=2")
+
+            // When: 서버 재시작 시뮬레이션
+            val newTableService = TableService(tableFileManager)
+
+            // Then: 재시작 후에도 삭제된 행이 보이지 않음
+            val result = newTableService.select("users")
+            assertEquals(2, result?.rows?.size)
+            assertTrue(result?.rows?.none { it["name"] == "Bob" } ?: false)
+        }
+
+        @Test
+        @DisplayName("전체 행 DELETE 후 파일 내 모든 행이 tombstone")
+        fun `all rows become tombstones after full delete`() {
+            // When: 전체 삭제
+            tableService.delete("users", null)
+
+            // Then: 모든 행이 tombstone
+            val stats = tableFileManager.getTableStatistics("users")
+            assertNotNull(stats)
+            assertEquals(3, stats!!.deletedRows)
+            assertEquals(0, stats.activeRows)
+        }
+
+        @Test
+        @DisplayName("빈 테이블에서 DELETE 시 0 반환")
+        fun `delete on empty table returns zero`() {
+            // Given: 빈 테이블 생성
+            tableService.createTable("empty_table", mapOf("id" to "INT"))
+
+            // When: 삭제 시도
+            val deletedCount = tableService.delete("empty_table", "id=1")
+
+            // Then: 0 반환, 예외 없음
+            assertEquals(0, deletedCount)
+        }
+
+        @Test
+        @DisplayName("이미 삭제된 행 재삭제 시 0 반환")
+        fun `re-deleting already deleted row returns zero`() {
+            // Given: id=1 삭제
+            tableService.delete("users", "id=1")
+
+            // When: 같은 조건으로 재삭제
+            val deletedCount = tableService.delete("users", "id=1")
+
+            // Then: 0 반환
+            assertEquals(0, deletedCount)
+        }
     }
 }

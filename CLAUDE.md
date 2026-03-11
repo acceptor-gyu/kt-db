@@ -230,6 +230,14 @@ The project uses **layer caching** and **BuildKit cache mounts** to optimize Doc
 - Source-only change: ~30 seconds (90% faster)
 - Details: See [DOCKER_BUILD_GUIDE.md](./DOCKER_BUILD_GUIDE.md)
 
+## Working with Files
+
+특정 파일을 수정하거나 분석하기 전에, 해당 파일이 속한 디렉토리의 `CLAUDE.md` 파일을 먼저 읽어 모듈의 구조와 맥락을 파악한 후 작업을 진행할 것.
+
+- `api-server/CLAUDE.md`: API 서버 모듈 설명
+- `common/src/CLAUDE.md`: 공통 모듈 설명
+- `db-server/src/CLAUDE.md`: DB 서버 모듈 설명
+
 ## Important Notes
 
 - **Disk I/O**: SELECT always reads from disk to ensure data consistency

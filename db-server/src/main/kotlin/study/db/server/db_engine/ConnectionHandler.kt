@@ -11,10 +11,6 @@ import study.db.common.protocol.DbResponse
 import study.db.common.protocol.ProtocolCodec
 import study.db.server.service.TableService
 import study.db.server.elasticsearch.service.ExplainService
-import study.db.server.elasticsearch.document.QueryPlan
-import study.db.server.exception.ColumnNotFoundException
-import study.db.server.exception.TypeMismatchException
-import study.db.server.exception.UnsupportedTypeException
 import study.db.server.exception.ExceptionMapper
 import study.db.server.exception.ResourceAlreadyExistsException
 import java.io.DataInputStream
@@ -149,9 +145,6 @@ class ConnectionHandler(
             // 기타 예외
             logger.error("Connection $connectionId unexpected error: ${e.message}", e)
         } finally {
-            // ⚠️ 중요: executor.shutdown()을 여기서 호출하면 안 됨!
-            // executor는 서버 전체에서 공유하는 스레드 풀이므로
-            // 개별 연결 종료 시에는 해당 연결의 리소스만 정리해야 함
             close()
         }
     }
@@ -322,7 +315,9 @@ class ConnectionHandler(
             trimmedSql.startsWith("CREATE TABLE", ignoreCase = true) -> parseAndHandleCreateTable(trimmedSql)
             trimmedSql.startsWith("INSERT INTO", ignoreCase = true) -> parseAndHandleInsert(trimmedSql)
             trimmedSql.startsWith("SELECT", ignoreCase = true) -> parseAndHandleSelect(trimmedSql)
+            trimmedSql.startsWith("DELETE", ignoreCase = true) -> parseAndHandleDelete(trimmedSql)
             trimmedSql.startsWith("DROP TABLE", ignoreCase = true) -> parseAndHandleDropTable(trimmedSql)
+            trimmedSql.startsWith("VACUUM", ignoreCase = true) -> parseAndHandleVacuum(trimmedSql)
             trimmedSql.startsWith("EXPLAIN", ignoreCase = true) -> parseAndHandleExplain(trimmedSql)
             else -> DbResponse(success = false, message = "Unsupported SQL query: $sql", errorCode = 400)
         }
@@ -429,6 +424,28 @@ class ConnectionHandler(
     }
 
     /**
+     * DELETE FROM users
+     * DELETE FROM users WHERE id=1
+     * DELETE FROM users WHERE name='Alice'
+     */
+    private fun parseAndHandleDelete(sql: String): DbResponse {
+        val regex = Regex("""DELETE\s+FROM\s+(\w+)(?:\s+WHERE\s+(.+))?""", RegexOption.IGNORE_CASE)
+        val match = regex.find(sql)
+            ?: return DbResponse(success = false, message = "Invalid DELETE syntax: $sql", errorCode = 400)
+
+        val tableName = match.groupValues[1]
+        val whereClause = match.groupValues.getOrNull(2)?.trim()
+
+        return ExceptionMapper.executeWithExceptionHandling(connectionId) {
+            val deletedCount = tableService.delete(tableName, whereClause)
+            DbResponse(
+                success = true,
+                message = "Deleted $deletedCount row(s)"
+            )
+        }
+    }
+
+    /**
      * EXPLAIN SELECT * FROM users
      */
     private fun parseAndHandleExplain(sql: String): DbResponse {
@@ -459,6 +476,42 @@ class ConnectionHandler(
                 message = "Query plan generated successfully",
                 data = queryPlanJson
             )
+        }
+    }
+
+    /**
+     * VACUUM 명령 파싱 및 처리
+     *
+     * 문법: VACUUM <table_name>
+     *
+     * 예: VACUUM users
+     */
+    private fun parseAndHandleVacuum(sql: String): DbResponse {
+        val regex = Regex("""VACUUM\s+(\w+)""", RegexOption.IGNORE_CASE)
+        val match = regex.find(sql)
+            ?: return DbResponse(success = false, message = "Invalid VACUUM syntax: $sql", errorCode = 400)
+
+        val tableName = match.groupValues[1]
+
+        return ExceptionMapper.executeWithExceptionHandling(connectionId) {
+            val stats = tableService.vacuum(tableName)
+
+            if (stats.success) {
+                // 성공 시 상세 통계 반환
+                val statsJson = objectMapper.writeValueAsString(stats)
+                DbResponse(
+                    success = true,
+                    message = stats.toSummary(),
+                    data = statsJson
+                )
+            } else {
+                // 실패 시 에러 메시지 반환
+                DbResponse(
+                    success = false,
+                    message = "VACUUM failed: ${stats.errorMessage}",
+                    errorCode = 500
+                )
+            }
         }
     }
 }

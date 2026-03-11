@@ -40,7 +40,8 @@ class DbTcpServer(
     private val port: Int,
     private val maxConnections: Int = 10,
     private val explainService: ExplainService? = null,  // EXPLAIN 명령 지원 (optional)
-    private val tableService: TableService? = null  // Spring Bean으로 주입받은 TableService (optional)
+    private val tableService: TableService? = null,  // Spring Bean으로 주입받은 TableService (optional)
+    private val vacuumScheduler: study.db.server.vacuum.VacuumScheduler? = null  // VACUUM 스케줄러 (optional)
 ) {
     companion object {
         private val logger = LoggerFactory.getLogger(DbTcpServer::class.java)
@@ -70,6 +71,9 @@ class DbTcpServer(
         // Bind to 0.0.0.0 (all IPv4 interfaces) to allow connections from other containers
         serverSocket = ServerSocket(port, 50, InetAddress.getByName("0.0.0.0"))
         running = true
+
+        // VACUUM 스케줄러 시작
+        vacuumScheduler?.start()
 
         logger.info("DB Server started on port {} (max connections: {})", port, maxConnections)
 
@@ -132,6 +136,9 @@ class DbTcpServer(
     fun stop() {
         logger.info("DB Server stopping...")
         running = false
+
+        // 0. VACUUM 스케줄러 중지
+        vacuumScheduler?.stop()
 
         // 1. 먼저 ServerSocket 닫기 (새 연결 차단)
         try {

@@ -2,6 +2,8 @@ package study.db.server.storage
 
 import org.slf4j.LoggerFactory
 import study.db.common.Table
+import study.db.common.where.WhereClause
+import study.db.common.where.WhereEvaluator
 import study.db.server.exception.UnsupportedTypeException
 import java.io.File
 import java.io.IOException
@@ -204,9 +206,13 @@ class TableFileManager(
                 val rowBytes = ByteArray(4 + rowLength)
                 System.arraycopy(pageData, offset, rowBytes, 0, 4 + rowLength)
 
-                // Decode row
-                val row = rowEncoder.decodeRow(rowBytes, schema)
-                rows.add(row)
+                // Decode row object (to check deleted flag)
+                val rowObject = rowEncoder.decodeRowObject(rowBytes, schema)
+
+                // Filter out deleted rows
+                if (rowObject.isActive()) {
+                    rows.add(rowObject.data)
+                }
 
                 offset += 4 + rowLength
             }
@@ -443,4 +449,367 @@ class TableFileManager(
 
         return count
     }
+
+    /**
+     * 테이블을 Row 객체 리스트로 읽기 (deleted 행 포함)
+     *
+     * DELETE 연산을 위해 deleted 플래그를 포함한 모든 행을 읽습니다.
+     *
+     * @param fileName 테이블 이름
+     * @return Row 객체 리스트 (deleted 행 포함) 또는 null
+     */
+    private fun readTableWithRows(fileName: String): Pair<Map<String, String>, List<study.db.common.Row>>? {
+        val file = File(dataDirectory, "$fileName.dat")
+        if (!file.exists()) return null
+
+        try {
+            val schema = readTableSchema(fileName) ?: return null
+            val pageCount = getPageCount(fileName)
+            if (pageCount == 0) {
+                return Pair(schema, emptyList())
+            }
+
+            val allRows = mutableListOf<study.db.common.Row>()
+            for (pageNumber in 0 until pageCount) {
+                val page = readPage(fileName, pageNumber) ?: continue
+                val rows = decodePageToRowObjects(page, schema)
+                allRows.addAll(rows)
+            }
+
+            return Pair(schema, allRows)
+        } catch (e: Exception) {
+            throw IOException("Failed to read table $fileName with rows", e)
+        }
+    }
+
+    /**
+     * Page 데이터를 Row 객체 리스트로 디코딩 (deleted 행 포함)
+     *
+     * @param page 페이지 객체
+     * @param schema 테이블 스키마
+     * @return Row 객체 리스트 (deleted 행 포함)
+     */
+    private fun decodePageToRowObjects(page: Page, schema: Map<String, String>): List<study.db.common.Row> {
+        val rows = mutableListOf<study.db.common.Row>()
+        var offset = 0
+        val pageData = page.data
+
+        try {
+            while (offset < pageData.size) {
+                if (offset + 4 > pageData.size) break
+
+                val lengthBuffer = ByteBuffer.wrap(pageData, offset, 4).order(ByteOrder.BIG_ENDIAN)
+                val rowLength = lengthBuffer.getInt()
+
+                if (rowLength <= 0 || offset + 4 + rowLength > pageData.size) break
+
+                val rowBytes = ByteArray(4 + rowLength)
+                System.arraycopy(pageData, offset, rowBytes, 0, 4 + rowLength)
+
+                val rowObject = rowEncoder.decodeRowObject(rowBytes, schema)
+                rows.add(rowObject)
+
+                offset += 4 + rowLength
+            }
+        } catch (e: Exception) {
+            // 파싱 오류 시 현재까지 디코딩한 rows 반환
+        }
+
+        return rows
+    }
+
+    /**
+     * Row 객체 리스트를 파일에 저장
+     *
+     * DELETE 연산 후 deleted 플래그가 포함된 Row 객체들을 파일에 저장합니다.
+     *
+     * @param tableName 테이블 이름
+     * @param schema 테이블 스키마
+     * @param rows Row 객체 리스트 (deleted 행 포함)
+     */
+    private fun writeTableWithRows(tableName: String, schema: Map<String, String>, rows: List<study.db.common.Row>) {
+        val file = File(dataDirectory, "$tableName.dat")
+        val tempFile = File(dataDirectory, "$tableName.dat.tmp")
+
+        try {
+            RandomAccessFile(tempFile, "rw").use { raf ->
+                // Write header (temporary row count includes deleted rows)
+                val buffer = ByteBuffer.allocate(24).order(ByteOrder.BIG_ENDIAN)
+                buffer.putShort(0xDBF0.toShort())  // Magic number
+                buffer.putShort(1)  // Version
+                buffer.putLong(rows.size.toLong())  // Row count (includes deleted)
+                buffer.putInt(schema.size)  // Column count
+
+                val schemaLength = schema.entries.sumOf { (name, _) ->
+                    2 + name.toByteArray(Charsets.UTF_8).size + 1
+                }
+                buffer.putInt(schemaLength)
+                buffer.putInt(0)  // Reserved
+
+                raf.write(buffer.array())
+
+                // Write schema
+                writeSchema(raf, schema)
+
+                // Write data rows (including deleted rows)
+                rows.forEach { row ->
+                    val rowBytes = rowEncoder.encodeRow(row, schema)
+                    raf.write(rowBytes)
+                }
+
+                raf.fd.sync()
+            }
+
+            // Atomic rename
+            if (file.exists()) file.delete()
+            tempFile.renameTo(file)
+
+            // Invalidate buffer pool cache
+            bufferPool?.invalidateTable(tableName)
+
+        } catch (e: Exception) {
+            tempFile.delete()
+            throw e
+        }
+    }
+
+    /**
+     * 조건에 맞는 행을 삭제 (Tombstone 방식)
+     *
+     * WHERE 조건에 맞는 행의 deleted 플래그를 true로 설정합니다.
+     * WhereEvaluator를 사용하여 타입 기반 비교를 지원합니다.
+     *
+     * @param tableName 테이블 이름
+     * @param schema 테이블 스키마
+     * @param whereClause WHERE 조건 (WhereClause.None이면 전체 삭제)
+     * @return 삭제된 행 개수
+     */
+    fun deleteRows(tableName: String, schema: Map<String, String>, whereClause: WhereClause): Int {
+        // 1. 모든 Row 읽기 (deleted 포함)
+        val (_, allRows) = readTableWithRows(tableName)
+            ?: return 0
+
+        // 2. 조건에 맞는 Row를 markAsDeleted()
+        var deletedCount = 0
+        val updatedRows = allRows.map { row ->
+            // 이미 삭제된 행은 건너뜀
+            if (row.deleted) {
+                row
+            } else {
+                // WhereEvaluator를 사용하여 조건 평가
+                val shouldDelete = WhereEvaluator.matches(row, whereClause, schema)
+
+                if (shouldDelete) {
+                    deletedCount++
+                    row.markAsDeleted()
+                } else {
+                    row
+                }
+            }
+        }
+
+        // 3. 파일에 저장
+        if (deletedCount > 0) {
+            writeTableWithRows(tableName, schema, updatedRows)
+            logger.info("Deleted $deletedCount row(s) from table '$tableName'")
+        }
+
+        return deletedCount
+    }
+
+    /**
+     * 테이블 통계 정보 조회
+     *
+     * VACUUM 실행 여부를 판단하기 위한 통계를 계산합니다.
+     *
+     * @param tableName 테이블 이름
+     * @return TableStatistics 객체 또는 null (파일 없음)
+     */
+    fun getTableStatistics(tableName: String): TableStatistics? {
+        val file = File(dataDirectory, "$tableName.dat")
+        if (!file.exists()) return null
+
+        try {
+            val (schema, allRows) = readTableWithRows(tableName) ?: return null
+
+            val totalRows = allRows.size
+            val deletedRows = allRows.count { it.deleted }
+            val activeRows = totalRows - deletedRows
+            val deletedRatio = if (totalRows > 0) deletedRows.toDouble() / totalRows else 0.0
+
+            return TableStatistics(
+                tableName = tableName,
+                totalRows = totalRows,
+                activeRows = activeRows,
+                deletedRows = deletedRows,
+                deletedRatio = deletedRatio,
+                fileSizeBytes = file.length(),
+                pageCount = getPageCount(tableName)
+            )
+        } catch (e: Exception) {
+            logger.error("Failed to get statistics for table: $tableName", e)
+            return null
+        }
+    }
+
+    /**
+     * 테이블 압축 (VACUUM) - Copy-on-Write 방식
+     *
+     * 삭제된 행(tombstone)을 물리적으로 제거하여 디스크 공간을 회수합니다.
+     *
+     * 알고리즘:
+     * 1. 파일 수정 시간 기록 (T1)
+     * 2. 활성 행만 새 파일(.vacuum)에 복사
+     * 3. 파일 수정 시간 재확인 (T2)
+     * 4. T1 == T2면 atomic file swap, 아니면 abort
+     *
+     * @param tableName 테이블 이름
+     * @return VacuumStats 통계 객체
+     */
+    fun compactTable(tableName: String): study.db.common.VacuumStats {
+        val file = File(dataDirectory, "$tableName.dat")
+        if (!file.exists()) {
+            return study.db.common.VacuumStats.failure("Table file not found: $tableName")
+        }
+
+        val startTime = java.time.Instant.now()
+        val vacuumFile = File(dataDirectory, "$tableName.dat.vacuum")
+
+        try {
+            // PHASE 1: SNAPSHOT - 파일 수정 시간 기록
+            val initialModifiedTime = file.lastModified()
+            val statsBefore = getTableStatistics(tableName)
+                ?: return study.db.common.VacuumStats.failure("Failed to get table statistics")
+
+            if (statsBefore.deletedRows == 0) {
+                return study.db.common.VacuumStats.notNeeded()
+            }
+
+            // PHASE 2: COPY - 활성 행만 새 파일에 복사
+            val (schema, allRows) = readTableWithRows(tableName)
+                ?: return study.db.common.VacuumStats.failure("Failed to read table")
+
+            val activeRows = allRows.filter { !it.deleted }
+
+            RandomAccessFile(vacuumFile, "rw").use { raf ->
+                // Write header
+                val buffer = java.nio.ByteBuffer.allocate(24).order(java.nio.ByteOrder.BIG_ENDIAN)
+                buffer.putShort(0xDBF0.toShort())  // Magic number
+                buffer.putShort(1)  // Version
+                buffer.putLong(activeRows.size.toLong())  // Row count (only active rows)
+                buffer.putInt(schema.size)  // Column count
+
+                val schemaLength = schema.entries.sumOf { (name, _) ->
+                    2 + name.toByteArray(Charsets.UTF_8).size + 1
+                }
+                buffer.putInt(schemaLength)
+                buffer.putInt(0)  // Reserved
+
+                raf.write(buffer.array())
+
+                // Write schema
+                writeSchema(raf, schema)
+
+                // Write only active rows
+                activeRows.forEach { row ->
+                    val rowBytes = rowEncoder.encodeRow(row, schema)
+                    raf.write(rowBytes)
+                }
+
+                raf.fd.sync()
+            }
+
+            // PHASE 3: VERIFICATION - 쓰기 감지 확인
+            val finalModifiedTime = file.lastModified()
+            if (initialModifiedTime != finalModifiedTime) {
+                vacuumFile.delete()
+                return study.db.common.VacuumStats.failure(
+                    errorMessage = "Concurrent write detected, VACUUM aborted",
+                    abortedDueToWrite = true
+                )
+            }
+
+            // PHASE 4: FILE SWAP - Atomic rename
+            val oldFile = File(dataDirectory, "$tableName.dat.old")
+
+            // Atomic file swap
+            if (!file.renameTo(oldFile)) {
+                vacuumFile.delete()
+                return study.db.common.VacuumStats.failure("Failed to rename original file")
+            }
+
+            if (!vacuumFile.renameTo(file)) {
+                oldFile.renameTo(file)  // Rollback
+                vacuumFile.delete()
+                return study.db.common.VacuumStats.failure("Failed to rename vacuum file")
+            }
+
+            oldFile.delete()
+
+            // BufferPool 무효화
+            try {
+                bufferPool?.invalidateTable(tableName)
+            } catch (e: Exception) {
+                logger.warn("Failed to invalidate BufferPool for table: $tableName", e)
+            }
+
+            // 통계 수집
+            val statsAfter = getTableStatistics(tableName)
+                ?: return study.db.common.VacuumStats.failure("Failed to get final statistics")
+
+            val endTime = java.time.Instant.now()
+            val durationMs = java.time.Duration.between(startTime, endTime).toMillis()
+
+            val diskSpaceSaved = statsBefore.fileSizeBytes - statsAfter.fileSizeBytes
+            val reductionPercent = if (statsBefore.fileSizeBytes > 0) {
+                (diskSpaceSaved.toDouble() / statsBefore.fileSizeBytes) * 100.0
+            } else 0.0
+
+            return study.db.common.VacuumStats(
+                totalRowsBefore = statsBefore.totalRows,
+                activeRows = statsAfter.activeRows,
+                deletedRowsRemoved = statsBefore.deletedRows,
+                diskSpaceBefore = statsBefore.fileSizeBytes,
+                diskSpaceAfter = statsAfter.fileSizeBytes,
+                diskSpaceSaved = diskSpaceSaved,
+                reductionPercent = reductionPercent,
+                pagesBefore = statsBefore.pageCount,
+                pagesAfter = statsAfter.pageCount,
+                pagesFreed = statsBefore.pageCount - statsAfter.pageCount,
+                startTime = startTime,
+                endTime = endTime,
+                durationMs = durationMs,
+                success = true
+            )
+
+        } catch (e: Exception) {
+            vacuumFile.delete()
+            logger.error("VACUUM failed for table: $tableName", e)
+            return study.db.common.VacuumStats.failure("VACUUM error: ${e.message}")
+        }
+    }
+
+    /**
+     * 파일 수정 시간 조회 (쓰기 감지용)
+     *
+     * @param tableName 테이블 이름
+     * @return 파일 수정 시간 (epoch ms) 또는 null
+     */
+    fun getFileModifiedTime(tableName: String): Long? {
+        val file = File(dataDirectory, "$tableName.dat")
+        return if (file.exists()) file.lastModified() else null
+    }
 }
+
+/**
+ * 테이블 통계 데이터 클래스
+ */
+data class TableStatistics(
+    val tableName: String,
+    val totalRows: Int,
+    val activeRows: Int,
+    val deletedRows: Int,
+    val deletedRatio: Double,
+    val fileSizeBytes: Long,
+    val pageCount: Int
+)

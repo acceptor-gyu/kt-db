@@ -1,8 +1,12 @@
 package study.db.server.service
 
 import org.slf4j.LoggerFactory
+import study.db.common.Row
 import study.db.common.Table
+import study.db.common.where.WhereClause
+import study.db.common.where.WhereEvaluator
 import study.db.server.db_engine.Resolver
+import study.db.server.exception.ColumnNotFoundException
 import study.db.server.storage.TableFileManager
 import java.util.concurrent.ConcurrentHashMap
 
@@ -16,7 +20,8 @@ import java.util.concurrent.ConcurrentHashMap
  * @param tableFileManager 파일 기반 persistence 관리자 (optional)
  */
 class TableService(
-    private val tableFileManager: TableFileManager? = null
+    private val tableFileManager: TableFileManager? = null,
+    private var vacuumService: study.db.server.vacuum.VacuumService? = null
 ) {
     private val logger = LoggerFactory.getLogger(TableService::class.java)
 
@@ -124,6 +129,80 @@ class TableService(
     }
 
     /**
+     * 데이터 삭제 (Thread-safe with tombstone marking)
+     *
+     * WHERE 조건에 맞는 행을 삭제합니다.
+     * - 파일 매니저가 있으면: 논리적 삭제 (deleted=true, tombstone 방식)
+     * - 파일 매니저가 없으면: 물리적 삭제 (메모리에서 행 제거)
+     *
+     * @param tableName 테이블 이름
+     * @param whereString WHERE 조건 문자열 (null이면 전체 삭제)
+     * @return 삭제된 행 개수
+     * @throws IllegalStateException 테이블이 존재하지 않을 때
+     * @throws ColumnNotFoundException WHERE 조건에 존재하지 않는 컬럼이 사용됐을 때
+     */
+    fun delete(tableName: String, whereString: String?): Int {
+        // 1. 테이블 존재 여부 확인
+        val existingTable = tables[tableName]
+            ?: throw IllegalStateException("Table '$tableName' not found")
+
+        // 2. WHERE 조건 파싱 (WhereClause 기반)
+        val whereClause = WhereClause.parse(whereString)
+
+        // 3. WHERE 조건 컬럼 존재 검증
+        validateWhereColumns(existingTable, whereClause)
+
+        // 4. 파일 매니저 유무에 따라 다른 처리
+        return if (tableFileManager != null) {
+            // 파일 기반: 논리적 삭제 (tombstone)
+            val deletedCount = tableFileManager.deleteRows(tableName, existingTable.dataType, whereClause)
+
+            // 메모리 테이블 업데이트 (deleted 행 제외)
+            tableFileManager.readTable(tableName)?.let { updatedTable ->
+                tables[tableName] = updatedTable
+            }
+
+            deletedCount
+        } else {
+            // 메모리 기반: 물리적 삭제 (테스트용)
+            var deletedCount = 0
+            tables.compute(tableName) { _, table ->
+                table?.let {
+                    val remainingRows = it.rows.filter { row ->
+                        val rowObj = Row(data = row)
+                        val shouldDelete = WhereEvaluator.matches(rowObj, whereClause, it.dataType)
+
+                        if (shouldDelete) {
+                            deletedCount++
+                            false  // 필터링하여 제거
+                        } else {
+                            true  // 유지
+                        }
+                    }
+                    it.copy(rows = remainingRows)
+                }
+            }
+            deletedCount
+        }
+    }
+
+    /**
+     * WHERE 조건에 사용된 컬럼이 테이블에 존재하는지 검증
+     *
+     * @param table 대상 테이블
+     * @param whereClause WHERE 조건
+     * @throws ColumnNotFoundException 존재하지 않는 컬럼이 사용됐을 때
+     */
+    private fun validateWhereColumns(table: Table, whereClause: WhereClause) {
+        val columnNames = whereClause.getColumnNames()
+        for (columnName in columnNames) {
+            if (!table.dataType.containsKey(columnName)) {
+                throw ColumnNotFoundException(table.tableName, columnName)
+            }
+        }
+    }
+
+    /**
      * 테이블 조회 (Thread-safe, Disk-based for full table scan)
      *
      * Full table scan: 파일에서 직접 읽어서 최신 데이터 보장
@@ -182,5 +261,39 @@ class TableService(
             "${it.key} ${it.value}"
         }
         return "CREATE TABLE ${table.tableName} ($columnsDefinition)"
+    }
+
+    /**
+     * VACUUM 실행 (삭제된 행 물리적 제거)
+     *
+     * @param tableName 테이블 이름
+     * @return VacuumStats 통계 객체
+     */
+    fun vacuum(tableName: String): study.db.common.VacuumStats {
+        if (!tableExists(tableName)) {
+            return study.db.common.VacuumStats.failure("Table '$tableName' not found")
+        }
+
+        if (vacuumService == null) {
+            return study.db.common.VacuumStats.failure("VACUUM service is not available")
+        }
+
+        val stats = vacuumService!!.vacuumTable(tableName)
+
+        // VACUUM 성공 시 메모리 테이블 업데이트
+        if (stats.success) {
+            tableFileManager?.readTable(tableName)?.let { updatedTable ->
+                tables[tableName] = updatedTable
+            }
+        }
+
+        return stats
+    }
+
+    /**
+     * VacuumService 설정 (Setter injection for circular dependency)
+     */
+    fun setVacuumService(service: study.db.server.vacuum.VacuumService) {
+        this.vacuumService = service
     }
 }
