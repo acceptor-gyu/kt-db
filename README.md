@@ -46,18 +46,20 @@ Kotlin으로 구현하는 관계형 데이터베이스
 ### 제한사항
 
 **현재 미지원 기능:**
-- ❌ WHERE 절 (조건부 SELECT)
+- ❌ SELECT WHERE 절 (WHERE는 DELETE에서만 동작)
 - ❌ UPDATE 문
-- ❌ DELETE 문 (레코드 삭제)
 - ❌ JOIN 연산
-- ❌ 인덱스 (EXPLAIN 분석용 메타데이터만 존재)
+- ❌ ORDER BY / GROUP BY / LIMIT
+- ❌ 인덱스 실행 (EXPLAIN 분석용 메타데이터만 존재)
 - ❌ 트랜잭션 (COMMIT/ROLLBACK)
-- ❌ NULL 값
+- ❌ 제약 조건 (PRIMARY KEY, UNIQUE, NOT NULL 등)
 
 **제약 조건:**
 - SELECT는 전체 테이블 스캔만 지원 (`SELECT * FROM table`)
 - 테이블당 하나의 파일로 저장 (파티셔닝 미지원)
 - 동시 쓰기는 thread-safe하지만 최적화는 제한적
+
+**상세 로드맵:** [ROADMAP.md](plan/ROADMAP.md)
 
 ## 프로젝트 구조
 
