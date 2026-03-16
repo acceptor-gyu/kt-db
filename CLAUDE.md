@@ -238,6 +238,8 @@ The project uses **layer caching** and **BuildKit cache mounts** to optimize Doc
 - `common/src/CLAUDE.md`: 공통 모듈 설명
 - `db-server/src/CLAUDE.md`: DB 서버 모듈 설명
 
+작업 후에는 해당 파일이 속한 디렉토리의 CLAUDE.md에 작업 내용을 반영한다.
+
 ## Important Notes
 
 - **Disk I/O**: SELECT always reads from disk to ensure data consistency

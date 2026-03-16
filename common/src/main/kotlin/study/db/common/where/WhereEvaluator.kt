@@ -73,7 +73,7 @@ object WhereEvaluator {
      *
      * @return 0이면 같음, 양수면 left > right, 음수면 left < right
      */
-    private fun compareValues(left: String, right: String, columnType: String): Int {
+    internal fun compareValues(left: String, right: String, columnType: String): Int {
         return when (columnType) {
             "INT" -> {
                 val leftInt = left.toIntOrNull() ?: 0
