@@ -11,6 +11,7 @@ import net.sf.jsqlparser.expression.operators.conditional.OrExpression
 import net.sf.jsqlparser.expression.operators.relational.*
 import net.sf.jsqlparser.schema.Column
 
+import study.db.server.db_engine.dto.OrderByColumn
 import org.springframework.stereotype.Component
 
 /**
@@ -55,7 +56,12 @@ class SqlParser {
             tableName = tableName,
             selectColumns = selectColumns,
             whereConditions = whereConditions,
-            orderBy = orderBy
+            orderBy = orderBy,
+            // 신규 필드
+            whereString = plainSelect.where?.toString(),
+            orderByColumns = parseOrderByColumns(plainSelect),
+            limit = plainSelect.limit?.rowCount?.toString()?.toIntOrNull(),
+            offset = plainSelect.offset?.offset?.toString()?.toIntOrNull()
         )
     }
 
@@ -306,6 +312,22 @@ class SqlParser {
             // expression: 정렬할 컬럼/표현식
             // isAsc: 오름차순 여부 (true=ASC, false=DESC)
             element.expression.toString()
+        }
+    }
+
+    /**
+     * ORDER BY 절을 OrderByColumn 리스트로 파싱 (ASC/DESC 방향 포함)
+     *
+     * e.g. "ORDER BY name ASC, age DESC"
+     *     -> [OrderByColumn("name", true), OrderByColumn("age", false)]
+     */
+    private fun parseOrderByColumns(plainSelect: PlainSelect): List<OrderByColumn> {
+        val orderByElements = plainSelect.orderByElements ?: return emptyList()
+        return orderByElements.map { element ->
+            OrderByColumn(
+                columnName = element.expression.toString(),
+                ascending = element.isAsc   // true=ASC (기본값), false=DESC
+            )
         }
     }
 }
