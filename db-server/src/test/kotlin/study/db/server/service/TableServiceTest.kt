@@ -914,4 +914,89 @@ class TableServiceTest {
             assertEquals(0, deletedCount)
         }
     }
+
+    @Nested
+    @DisplayName("SELECT WHERE 필터링 테스트")
+    inner class SelectWhereTest {
+
+        @BeforeEach
+        fun setUp() {
+            tableService.createTable("users", mapOf("id" to "INT", "name" to "VARCHAR", "age" to "INT"))
+            tableService.insert("users", mapOf("id" to "1", "name" to "Alice", "age" to "30"))
+            tableService.insert("users", mapOf("id" to "2", "name" to "Bob", "age" to "25"))
+            tableService.insert("users", mapOf("id" to "3", "name" to "Charlie", "age" to "35"))
+        }
+
+        @Test
+        @DisplayName("등호 조건 WHERE 필터링")
+        fun `등호 조건 WHERE 필터링`() {
+            val result = tableService.select("users", whereString = "name='Alice'")
+            assertNotNull(result)
+            assertEquals(1, result!!.rows.size)
+            assertEquals("Alice", result.rows[0]["name"])
+        }
+
+        @Test
+        @DisplayName("비교 연산자 WHERE 필터링")
+        fun `비교 연산자 WHERE 필터링`() {
+            val result = tableService.select("users", whereString = "age > 28")
+            assertNotNull(result)
+            assertEquals(2, result!!.rows.size)  // Alice(30), Charlie(35)
+        }
+
+        @Test
+        @DisplayName("AND 조건 WHERE 필터링")
+        fun `AND 조건 WHERE 필터링`() {
+            val result = tableService.select("users", whereString = "age > 28 AND name='Alice'")
+            assertNotNull(result)
+            assertEquals(1, result!!.rows.size)
+            assertEquals("Alice", result.rows[0]["name"])
+        }
+
+        @Test
+        @DisplayName("OR 조건 WHERE 필터링")
+        fun `OR 조건 WHERE 필터링`() {
+            val result = tableService.select("users", whereString = "id=1 OR id=3")
+            assertNotNull(result)
+            assertEquals(2, result!!.rows.size)
+        }
+
+        @Test
+        @DisplayName("INT 숫자 비교 (사전순 아닌 숫자순)")
+        fun `INT 숫자 비교 (사전순 아닌 숫자순)`() {
+            // age: 3, 25, 100 → 사전순이면 "100" < "25" < "3", 숫자순이면 3 < 25 < 100
+            tableService.createTable("nums", mapOf("age" to "INT"))
+            tableService.insert("nums", mapOf("age" to "3"))
+            tableService.insert("nums", mapOf("age" to "100"))
+            tableService.insert("nums", mapOf("age" to "25"))
+            val result = tableService.select("nums", whereString = "age > 25")
+            assertNotNull(result)
+            assertEquals(1, result!!.rows.size)
+            assertEquals("100", result.rows[0]["age"])
+        }
+
+        @Test
+        @DisplayName("WHERE 없음 - 전체 반환")
+        fun `WHERE 없음 - 전체 반환`() {
+            val result = tableService.select("users")
+            assertNotNull(result)
+            assertEquals(3, result!!.rows.size)
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 컬럼 WHERE - 예외 발생")
+        fun `존재하지 않는 컬럼 WHERE - 예외 발생`() {
+            assertThrows<ColumnNotFoundException> {
+                tableService.select("users", whereString = "email='test'")
+            }
+        }
+
+        @Test
+        @DisplayName("조건 만족 행 없음 - 빈 rows 반환")
+        fun `조건 만족 행 없음 - 빈 rows 반환`() {
+            val result = tableService.select("users", whereString = "id=999")
+            assertNotNull(result)
+            assertEquals(0, result!!.rows.size)
+        }
+    }
 }

@@ -208,13 +208,26 @@ class TableService(
      * Full table scan: 파일에서 직접 읽어서 최신 데이터 보장
      * - tableFileManager가 있으면 디스크에서 읽기
      * - 없으면 메모리 캐시에서 읽기 (fallback)
+     * - whereString이 있으면 WHERE 조건 필터링 적용
      *
      * @param tableName 테이블 이름
+     * @param whereString WHERE 절 문자열 (null이면 전체 반환)
      * @return Table 객체 또는 null
+     * @throws ColumnNotFoundException WHERE 조건에 존재하지 않는 컬럼이 사용됐을 때
      */
-    fun select(tableName: String): Table? {
+    fun select(tableName: String, whereString: String? = null): Table? {
         // 디스크에서 최신 데이터 읽기 (full table scan)
-        return tableFileManager?.readTable(tableName) ?: tables[tableName]
+        val table = tableFileManager?.readTable(tableName) ?: tables[tableName] ?: return null
+
+        if (whereString == null) return table
+
+        val whereClause = WhereClause.parse(whereString)
+        validateWhereColumns(table, whereClause)
+
+        val filteredRows = table.rows.filter { row ->
+            WhereEvaluator.matches(Row(data = row), whereClause, table.dataType)
+        }
+        return table.copy(rows = filteredRows)
     }
 
     /**
