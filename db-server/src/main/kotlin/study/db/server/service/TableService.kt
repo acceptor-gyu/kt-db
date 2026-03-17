@@ -6,6 +6,7 @@ import study.db.common.Table
 import study.db.common.where.WhereClause
 import study.db.common.where.WhereEvaluator
 import study.db.server.db_engine.Resolver
+import study.db.server.db_engine.dto.OrderByColumn
 import study.db.server.exception.ColumnNotFoundException
 import study.db.server.storage.TableFileManager
 import java.util.concurrent.ConcurrentHashMap
@@ -205,16 +206,76 @@ class TableService(
     /**
      * 테이블 조회 (Thread-safe, Disk-based for full table scan)
      *
-     * Full table scan: 파일에서 직접 읽어서 최신 데이터 보장
+     * 실행 파이프라인: WHERE 필터링 → ORDER BY 정렬 → 컬럼 프로젝션
      * - tableFileManager가 있으면 디스크에서 읽기
      * - 없으면 메모리 캐시에서 읽기 (fallback)
      *
      * @param tableName 테이블 이름
+     * @param whereString WHERE 절 문자열 (null이면 전체 반환)
+     * @param columns 조회할 컬럼 목록 (null 또는 ["*"]이면 전체 컬럼 반환)
+     * @param orderBy ORDER BY 컬럼 목록 (null이면 삽입 순서 유지)
      * @return Table 객체 또는 null
+     * @throws ColumnNotFoundException WHERE 조건, 컬럼 목록, ORDER BY에 존재하지 않는 컬럼이 사용됐을 때
      */
-    fun select(tableName: String): Table? {
+    fun select(
+        tableName: String,
+        whereString: String? = null,
+        columns: List<String>? = null,
+        orderBy: List<OrderByColumn>? = null,
+        limit: Int? = null,
+        offset: Int? = null
+    ): Table? {
         // 디스크에서 최신 데이터 읽기 (full table scan)
-        return tableFileManager?.readTable(tableName) ?: tables[tableName]
+        val table = tableFileManager?.readTable(tableName) ?: tables[tableName] ?: return null
+
+        // 1. WHERE 필터링
+        val filteredRows = if (whereString == null) {
+            table.rows
+        } else {
+            val whereClause = WhereClause.parse(whereString)
+            validateWhereColumns(table, whereClause)
+            table.rows.filter { row ->
+                WhereEvaluator.matches(Row(data = row), whereClause, table.dataType)
+            }
+        }
+
+        // 2. ORDER BY 정렬 (프로젝션 전 - 정렬 컬럼이 SELECT 컬럼에 없을 수 있으므로)
+        val sortedRows = if (orderBy.isNullOrEmpty()) {
+            filteredRows
+        } else {
+            Resolver.validateOrderByColumns(table, orderBy)
+            filteredRows.sortedWith(
+                Comparator { row1, row2 ->
+                    for (col in orderBy) {
+                        val v1 = row1[col.columnName] ?: ""
+                        val v2 = row2[col.columnName] ?: ""
+                        val colType = table.dataType[col.columnName]?.uppercase() ?: "VARCHAR"
+                        val cmp = WhereEvaluator.compareValues(v1, v2, colType)
+                        if (cmp != 0) return@Comparator if (col.ascending) cmp else -cmp
+                    }
+                    0
+                }
+            )
+        }
+
+        // 3. OFFSET/LIMIT 적용 (정렬 후, 프로젝션 전)
+        val pagedRows = sortedRows
+            .let { if (offset != null) it.drop(offset) else it }
+            .let { if (limit != null) it.take(limit) else it }
+
+        // 4. 컬럼 프로젝션 (OFFSET/LIMIT 후)
+        if (columns == null || columns == listOf("*")) {
+            return table.copy(rows = pagedRows)
+        }
+
+        Resolver.validateSelectColumns(table, columns)
+
+        val projectedRows = pagedRows.map { row ->
+            row.filterKeys { it in columns }
+        }
+        val projectedDataType = table.dataType.filterKeys { it in columns }
+
+        return table.copy(rows = projectedRows, dataType = projectedDataType)
     }
 
     /**

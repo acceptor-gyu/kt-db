@@ -859,8 +859,8 @@ docker compose down
 - 레이어 캐싱 및 BuildKit 캐시 마운트 활용
 
 자세한 사용법:
-- 일반 사용: [DOCKER_GUIDE.md](./DOCKER_GUIDE.md)
-- 빌드 최적화: [DOCKER_BUILD_GUIDE.md](./DOCKER_BUILD_GUIDE.md)
+- 일반 사용: [DOCKER_GUIDE.md](./GUIDE/DOCKER_GUIDE.md)
+- 빌드 최적화: [DOCKER_BUILD_GUIDE.md](./GUIDE/DOCKER_BUILD_GUIDE.md)
 
 ### 방법 2: 로컬 실행 (Gradle)
 
@@ -1122,16 +1122,17 @@ Server: TCP → UTF-8 → SQL → 파싱 → 실행
 | 문서 | 설명 |
 |------|------|
 | [README.md](./README.md) | 프로젝트 개요, 아키텍처, API 사용법 |
-| [BUFFER_POOL_GUIDE.md](./BUFFER_POOL_GUIDE.md) | **Buffer Pool 개념 및 원리** (LRU 캐싱, 성능 최적화) |
-| [DOCKER_GUIDE.md](./DOCKER_GUIDE.md) | Docker Compose 사용 가이드 (실행, 로그, 트러블슈팅) |
-| [DOCKER_BUILD_GUIDE.md](./DOCKER_BUILD_GUIDE.md) | Docker 빌드 최적화 가이드 (레이어 캐싱, BuildKit) |
-| [EXPLAIN_GUIDE.md](./EXPLAIN_GUIDE.md) | EXPLAIN 쿼리 분석 기능 상세 가이드 |
+| [GUIDE/DOCKER_GUIDE.md](./GUIDE/DOCKER_GUIDE.md) | Docker Compose 사용 가이드 (실행, 로그, 트러블슈팅) |
+| [GUIDE/DOCKER_BUILD_GUIDE.md](./GUIDE/DOCKER_BUILD_GUIDE.md) | Docker 빌드 최적화 가이드 (레이어 캐싱, BuildKit) |
+| [GUIDE/EXPLAIN_GUIDE.md](./GUIDE/EXPLAIN_GUIDE.md) | EXPLAIN 쿼리 분석 기능 상세 가이드 |
+| [GUIDE/DELETE_VACUUM_GUIDE.md](./GUIDE/DELETE_VACUUM_GUIDE.md) | DELETE와 VACUUM 동작 원리 |
+| [GUIDE/SELECT_GUIDE.md](./GUIDE/SELECT_GUIDE.md) | SELECT 강화 기능 (WHERE/ORDER BY/LIMIT/OFFSET) |
 | [PROFILES.md](./PROFILES.md) | Spring Profile 설정 및 환경별 구성 |
 
 **핵심 개념:**
-- **Buffer Pool**: BUFFER_POOL_GUIDE.md (페이지 캐싱, LRU, 성능 최적화)
+- **Buffer Pool**: GUIDE/BUFFER_POOL_GUIDE.md (페이지 캐싱, LRU, 성능 최적화) <!-- TODO: 문서 미작성 -->
 - **디스크 I/O**: README.md > "디스크 기반 영속성" 섹션
 - **Thread-Safety**: README.md > "Thread-Safety 보장" 섹션
-- **EXPLAIN**: EXPLAIN_GUIDE.md
-- **Docker 최적화**: DOCKER_BUILD_GUIDE.md
+- **EXPLAIN**: GUIDE/EXPLAIN_GUIDE.md
+- **Docker 최적화**: GUIDE/DOCKER_BUILD_GUIDE.md
 

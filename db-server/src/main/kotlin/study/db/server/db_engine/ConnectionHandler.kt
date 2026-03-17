@@ -62,7 +62,8 @@ class ConnectionHandler(
     private val socket: Socket,
     private val tableService: TableService,  // 모든 연결이 공유하는 TableService (Thread-safe 구현 필요)
     private val connectionManager: ConnectionManager? = null,  // 연결 관리자 (optional)
-    private val explainService: ExplainService? = null  // EXPLAIN 명령 처리 서비스
+    private val explainService: ExplainService? = null,  // EXPLAIN 명령 처리 서비스
+    private val sqlParser: SqlParser = SqlParser()  // SQL 파서 (기본값으로 기존 테스트 호환)
 ) : Runnable {
 
     companion object {
@@ -385,21 +386,24 @@ class ConnectionHandler(
 
     /**
      * SELECT * FROM users
+     * SELECT name FROM users WHERE age > 20 ORDER BY name ASC LIMIT 10 OFFSET 5
      */
     private fun parseAndHandleSelect(sql: String): DbResponse {
-        val regex = Regex("""SELECT\s+.+?\s+FROM\s+(\w+)(?:\s+WHERE\s+(.+))?""", RegexOption.IGNORE_CASE)
-        val match = regex.find(sql)
-            ?: return DbResponse(success = false, message = "Invalid SELECT syntax: $sql", errorCode = 400)
-
-        val tableName = match.groupValues[1]
-        // Note: condition is parsed but not currently used by tableService
-        // val condition = match.groupValues.getOrNull(2)?.takeIf { it.isNotBlank() }
-
         return ExceptionMapper.executeWithExceptionHandling(connectionId) {
-            val table = tableService.select(tableName)
-                ?: throw IllegalStateException("Table '$tableName' not found")
+            val parsed = sqlParser.parseQuery(sql)
 
-            // Table 객체를 JSON 문자열로 직렬화
+            val columns = parsed.selectColumns.takeUnless { it == listOf("*") }
+            val orderBy = parsed.orderByColumns.ifEmpty { null }
+
+            val table = tableService.select(
+                tableName = parsed.tableName,
+                whereString = parsed.whereString,
+                columns = columns,
+                orderBy = orderBy,
+                limit = parsed.limit,
+                offset = parsed.offset
+            ) ?: throw IllegalStateException("Table '${parsed.tableName}' not found")
+
             DbResponse(success = true, data = json.encodeToString<Table>(table))
         }
     }

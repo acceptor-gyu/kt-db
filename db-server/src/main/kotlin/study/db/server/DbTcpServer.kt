@@ -3,6 +3,7 @@ package study.db.server
 import org.slf4j.LoggerFactory
 import study.db.server.db_engine.ConnectionHandler
 import study.db.server.db_engine.ConnectionManager
+import study.db.server.db_engine.SqlParser
 import study.db.server.service.TableService
 import study.db.server.elasticsearch.service.ExplainService
 import java.net.InetAddress
@@ -104,7 +105,8 @@ class DbTcpServer(
                     socket = clientSocket,
                     tableService = sharedTableService,
                     connectionManager = connectionManager,
-                    explainService = explainService
+                    explainService = explainService,
+                    sqlParser = SqlParser()
                 )
 
                 try {

@@ -1,6 +1,7 @@
 package study.db.server.db_engine
 
 import study.db.common.Table
+import study.db.server.db_engine.dto.OrderByColumn
 import study.db.server.exception.ColumnNotFoundException
 import study.db.server.exception.TypeMismatchException
 import study.db.server.validation.TypeValidator
@@ -77,6 +78,33 @@ object Resolver {
     fun validateInsertData(table: Table, values: Map<String, String>) {
         values.forEach { (columnName, value) ->
             validateColumnType(table, columnName, value)
+        }
+    }
+
+    /**
+     * SELECT 컬럼 존재 여부 확인
+     *
+     * @param table 대상 테이블
+     * @param columns 조회할 컬럼 목록 ("*"이 포함되면 전체 허용)
+     * @throws ColumnNotFoundException 컬럼이 테이블에 정의되지 않았을 때
+     */
+    fun validateSelectColumns(table: Table, columns: List<String>) {
+        if (columns.contains("*")) return
+        columns.forEach { columnName ->
+            validateColumnExists(table, columnName)
+        }
+    }
+
+    /**
+     * ORDER BY 컬럼 존재 여부 확인
+     *
+     * @param table 대상 테이블
+     * @param orderBy ORDER BY 컬럼 목록
+     * @throws ColumnNotFoundException 컬럼이 테이블에 정의되지 않았을 때
+     */
+    fun validateOrderByColumns(table: Table, orderBy: List<OrderByColumn>) {
+        orderBy.forEach { orderByColumn ->
+            validateColumnExists(table, orderByColumn.columnName)
         }
     }
 }

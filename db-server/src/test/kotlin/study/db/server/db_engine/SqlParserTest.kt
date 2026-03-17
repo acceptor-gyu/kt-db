@@ -1,10 +1,12 @@
 package study.db.server.db_engine
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import study.db.server.db_engine.dto.OrderByColumn
 import study.db.server.db_engine.dto.WhereCondition
 
 /**
@@ -468,6 +470,52 @@ class SqlParserTest {
             assertThrows(Exception::class.java) {
                 sqlParser.parseQuery(emptySql)
             }
+        }
+    }
+
+    @Nested
+    @DisplayName("SELECT 파싱 확장 테스트")
+    inner class SelectParsingExtensionTest {
+
+        @Test
+        fun `ASC ORDER BY 파싱`() {
+            val result = sqlParser.parseQuery("SELECT * FROM users ORDER BY name ASC")
+            assertThat(result.orderByColumns).isEqualTo(listOf(OrderByColumn("name", true)))
+        }
+
+        @Test
+        fun `DESC ORDER BY 파싱`() {
+            val result = sqlParser.parseQuery("SELECT * FROM users ORDER BY age DESC")
+            assertThat(result.orderByColumns).isEqualTo(listOf(OrderByColumn("age", false)))
+        }
+
+        @Test
+        fun `다중 컬럼 ASC DESC 혼합 ORDER BY 파싱`() {
+            val result = sqlParser.parseQuery("SELECT * FROM users ORDER BY name ASC, age DESC")
+            assertThat(result.orderByColumns).isEqualTo(
+                listOf(OrderByColumn("name", true), OrderByColumn("age", false))
+            )
+        }
+
+        @Test
+        fun `LIMIT 파싱`() {
+            val result = sqlParser.parseQuery("SELECT * FROM users LIMIT 10")
+            assertThat(result.limit).isEqualTo(10)
+            assertThat(result.offset).isNull()
+        }
+
+        @Test
+        fun `LIMIT + OFFSET 파싱`() {
+            val result = sqlParser.parseQuery("SELECT * FROM users LIMIT 10 OFFSET 20")
+            assertThat(result.limit).isEqualTo(10)
+            assertThat(result.offset).isEqualTo(20)
+        }
+
+        @Test
+        fun `WHERE 원문 문자열 파싱`() {
+            val result = sqlParser.parseQuery("SELECT * FROM users WHERE age > 20")
+            assertThat(result.whereString).isNotNull()
+            assertThat(result.whereString).contains("age")
         }
     }
 
