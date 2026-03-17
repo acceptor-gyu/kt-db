@@ -221,7 +221,9 @@ class TableService(
         tableName: String,
         whereString: String? = null,
         columns: List<String>? = null,
-        orderBy: List<OrderByColumn>? = null
+        orderBy: List<OrderByColumn>? = null,
+        limit: Int? = null,
+        offset: Int? = null
     ): Table? {
         // 디스크에서 최신 데이터 읽기 (full table scan)
         val table = tableFileManager?.readTable(tableName) ?: tables[tableName] ?: return null
@@ -256,14 +258,19 @@ class TableService(
             )
         }
 
-        // 3. 컬럼 프로젝션 (ORDER BY 후)
+        // 3. OFFSET/LIMIT 적용 (정렬 후, 프로젝션 전)
+        val pagedRows = sortedRows
+            .let { if (offset != null) it.drop(offset) else it }
+            .let { if (limit != null) it.take(limit) else it }
+
+        // 4. 컬럼 프로젝션 (OFFSET/LIMIT 후)
         if (columns == null || columns == listOf("*")) {
-            return table.copy(rows = sortedRows)
+            return table.copy(rows = pagedRows)
         }
 
         Resolver.validateSelectColumns(table, columns)
 
-        val projectedRows = sortedRows.map { row ->
+        val projectedRows = pagedRows.map { row ->
             row.filterKeys { it in columns }
         }
         val projectedDataType = table.dataType.filterKeys { it in columns }

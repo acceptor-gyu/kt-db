@@ -1136,4 +1136,83 @@ class TableServiceTest {
             assertThat(result!!.rows.map { it["name"] }).isSortedAccordingTo(compareBy { it })
         }
     }
+
+    @Nested
+    @DisplayName("SELECT LIMIT/OFFSET 페이지네이션 테스트")
+    inner class SelectLimitOffsetTest {
+
+        @BeforeEach
+        fun setUp() {
+            tableService.createTable("items", mapOf("id" to "INT"))
+            (1..10).forEach { i -> tableService.insert("items", mapOf("id" to "$i")) }
+        }
+
+        @Test
+        @DisplayName("LIMIT만 지정")
+        fun `LIMIT만 지정`() {
+            val result = tableService.select("items", limit = 3)
+            assertThat(result!!.rows).hasSize(3)
+            assertThat(result.rows[0]["id"]).isEqualTo("1")
+        }
+
+        @Test
+        @DisplayName("OFFSET만 지정")
+        fun `OFFSET만 지정`() {
+            val result = tableService.select("items", offset = 7)
+            assertThat(result!!.rows).hasSize(3)  // id=8,9,10
+        }
+
+        @Test
+        @DisplayName("LIMIT + OFFSET 조합")
+        fun `LIMIT + OFFSET 조합`() {
+            val result = tableService.select("items", limit = 3, offset = 5)
+            assertThat(result!!.rows).hasSize(3)
+            assertThat(result.rows[0]["id"]).isEqualTo("6")
+        }
+
+        @Test
+        @DisplayName("LIMIT이 전체보다 큰 경우 - 전체 반환")
+        fun `LIMIT이 전체보다 큰 경우 - 전체 반환`() {
+            val result = tableService.select("items", limit = 100)
+            assertThat(result!!.rows).hasSize(10)
+        }
+
+        @Test
+        @DisplayName("OFFSET이 전체보다 큰 경우 - 빈 rows 반환")
+        fun `OFFSET이 전체보다 큰 경우 - 빈 rows 반환`() {
+            val result = tableService.select("items", offset = 100)
+            assertThat(result).isNotNull()
+            assertThat(result!!.rows).isEmpty()
+        }
+
+        @Test
+        @DisplayName("LIMIT = 0")
+        fun `LIMIT = 0`() {
+            val result = tableService.select("items", limit = 0)
+            assertThat(result!!.rows).isEmpty()
+        }
+
+        @Test
+        @DisplayName("ORDER BY + LIMIT 조합")
+        fun `ORDER BY + LIMIT 조합`() {
+            val result = tableService.select("items",
+                orderBy = listOf(OrderByColumn("id", false)),
+                limit = 3
+            )
+            assertThat(result!!.rows.map { it["id"] }).containsExactly("10", "9", "8")
+        }
+
+        @Test
+        @DisplayName("풀 파이프라인 (WHERE + ORDER BY + LIMIT + OFFSET)")
+        fun `풀 파이프라인 (WHERE + ORDER BY + LIMIT + OFFSET)`() {
+            // WHERE id>3(7개) → DESC 정렬(10,9,8,7,6,5,4) → OFFSET 1(9,8,7,6,5,4) → LIMIT 3(9,8,7)
+            val result = tableService.select("items",
+                whereString = "id > 3",
+                orderBy = listOf(OrderByColumn("id", false)),
+                limit = 3,
+                offset = 1
+            )
+            assertThat(result!!.rows.map { it["id"] }).containsExactly("9", "8", "7")
+        }
+    }
 }
