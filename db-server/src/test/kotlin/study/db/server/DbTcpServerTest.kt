@@ -4,6 +4,7 @@ import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*
 import study.db.common.protocol.ProtocolCodec
 import java.net.Socket
+import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
 /**
@@ -14,6 +15,7 @@ import kotlin.concurrent.thread
  * 2. 최대 연결 수 초과 시 거부 (Connection Pool Exhaustion)
  * 3. 동시 다중 연결 처리
  */
+@Timeout(30, unit = TimeUnit.SECONDS)
 class DbTcpServerTest {
 
     @Test
