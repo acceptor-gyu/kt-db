@@ -250,7 +250,7 @@ class TableService(
                         val v1 = row1[col.columnName] ?: ""
                         val v2 = row2[col.columnName] ?: ""
                         val colType = table.dataType[col.columnName]?.uppercase() ?: "VARCHAR"
-                        val cmp = compareByType(v1, v2, colType)
+                        val cmp = WhereEvaluator.compareValues(v1, v2, colType)
                         if (cmp != 0) return@Comparator if (col.ascending) cmp else -cmp
                     }
                     0
@@ -276,22 +276,6 @@ class TableService(
         val projectedDataType = table.dataType.filterKeys { it in columns }
 
         return table.copy(rows = projectedRows, dataType = projectedDataType)
-    }
-
-    /**
-     * 컬럼 타입에 따른 값 비교
-     *
-     * @param left 왼쪽 값
-     * @param right 오른쪽 값
-     * @param columnType 컬럼 타입 (대문자)
-     * @return 음수: left < right, 0: 같음, 양수: left > right
-     */
-    private fun compareByType(left: String, right: String, columnType: String): Int {
-        return when (columnType) {
-            "INT" -> (left.toIntOrNull() ?: 0).compareTo(right.toIntOrNull() ?: 0)
-            "TIMESTAMP" -> (left.toLongOrNull() ?: 0L).compareTo(right.toLongOrNull() ?: 0L)
-            else -> left.compareTo(right)
-        }
     }
 
     /**

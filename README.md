@@ -1130,7 +1130,7 @@ Server: TCP → UTF-8 → SQL → 파싱 → 실행
 | [PROFILES.md](./PROFILES.md) | Spring Profile 설정 및 환경별 구성 |
 
 **핵심 개념:**
-- **Buffer Pool**: BUFFER_POOL_GUIDE.md (페이지 캐싱, LRU, 성능 최적화)
+- **Buffer Pool**: GUIDE/BUFFER_POOL_GUIDE.md (페이지 캐싱, LRU, 성능 최적화) <!-- TODO: 문서 미작성 -->
 - **디스크 I/O**: README.md > "디스크 기반 영속성" 섹션
 - **Thread-Safety**: README.md > "Thread-Safety 보장" 섹션
 - **EXPLAIN**: GUIDE/EXPLAIN_GUIDE.md

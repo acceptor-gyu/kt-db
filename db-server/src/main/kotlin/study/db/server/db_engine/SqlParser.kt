@@ -61,7 +61,10 @@ class SqlParser {
             whereString = plainSelect.where?.toString(),
             orderByColumns = parseOrderByColumns(plainSelect),
             limit = plainSelect.limit?.rowCount?.toString()?.toIntOrNull(),
+            // LIMIT count OFFSET offset 형태: plainSelect.offset에 offset이 있음
+            // LIMIT offset, count 형태 (MySQL): plainSelect.limit.offset에 offset이 있음
             offset = plainSelect.offset?.offset?.toString()?.toIntOrNull()
+                ?: plainSelect.limit?.offset?.toString()?.toIntOrNull()
         )
     }
 
