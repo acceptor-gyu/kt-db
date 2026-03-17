@@ -893,5 +893,5 @@ SELECT 실행 요청
 
 - [05-query-optimization.md](./05-query-optimization.md) — 비용 기반 최적화 개념
 - [06-statistics-and-metadata.md](./06-statistics-and-metadata.md) — 통계 & 메타데이터 개념
-- [EXPLAIN_GUIDE.md](../../EXPLAIN_GUIDE.md) — 실행 가이드
+- [EXPLAIN_GUIDE.md](../../GUIDE/EXPLAIN_GUIDE.md) — 실행 가이드
 - `db-server/src/main/kotlin/study/db/server/elasticsearch/` — 구현 소스

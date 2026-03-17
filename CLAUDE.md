@@ -119,7 +119,12 @@ data class Table(
 ### Supported SQL Commands
 - **CREATE TABLE**: `CREATE TABLE users (id INT, name VARCHAR)`
 - **INSERT**: `INSERT INTO users VALUES (id="1", name="John")`
-- **SELECT**: `SELECT * FROM users` (full table scan only)
+- **SELECT**: Full pipeline support
+  - `SELECT * FROM users`
+  - `SELECT name, age FROM users WHERE age > 20`
+  - `SELECT * FROM users ORDER BY age DESC, name ASC`
+  - `SELECT name FROM users WHERE age > 20 ORDER BY name ASC LIMIT 10 OFFSET 5`
+- **DELETE**: `DELETE FROM users WHERE id=1`
 - **DROP TABLE**: `DROP TABLE users`
 - **EXPLAIN**: `EXPLAIN SELECT * FROM users WHERE name='Alice'`
 - **PING**: Connection health check
@@ -228,7 +233,7 @@ docker compose up -d elasticsearch
 The project uses **layer caching** and **BuildKit cache mounts** to optimize Docker builds:
 - First build: ~5 minutes
 - Source-only change: ~30 seconds (90% faster)
-- Details: See [DOCKER_BUILD_GUIDE.md](./DOCKER_BUILD_GUIDE.md)
+- Details: See [DOCKER_BUILD_GUIDE.md](./GUIDE/DOCKER_BUILD_GUIDE.md)
 
 ## Working with Files
 
@@ -243,7 +248,7 @@ The project uses **layer caching** and **BuildKit cache mounts** to optimize Doc
 ## Important Notes
 
 - **Disk I/O**: SELECT always reads from disk to ensure data consistency
-- **No WHERE support**: SELECT only supports full table scans
+- **SELECT pipeline**: WHERE → ORDER BY → LIMIT/OFFSET → 컬럼 프로젝션 순서로 실행
 - **No transactions**: No COMMIT/ROLLBACK support
 - **No NULL values**: All columns must have values
 - **Thread-safe writes**: Multiple connections can write concurrently
@@ -252,7 +257,9 @@ The project uses **layer caching** and **BuildKit cache mounts** to optimize Doc
 ## Documentation
 
 - [README.md](./README.md): Project overview and architecture
-- [DOCKER_GUIDE.md](./DOCKER_GUIDE.md): Docker usage guide
-- [DOCKER_BUILD_GUIDE.md](./DOCKER_BUILD_GUIDE.md): Build optimization
-- [EXPLAIN_GUIDE.md](./EXPLAIN_GUIDE.md): EXPLAIN feature guide
+- [GUIDE/SELECT_GUIDE.md](./GUIDE/SELECT_GUIDE.md): SELECT 강화 기능 (WHERE/ORDER BY/LIMIT/OFFSET/컬럼 선택)
+- [GUIDE/DELETE_VACUUM_GUIDE.md](./GUIDE/DELETE_VACUUM_GUIDE.md): DELETE와 VACUUM 동작 원리
+- [GUIDE/DOCKER_GUIDE.md](./GUIDE/DOCKER_GUIDE.md): Docker usage guide
+- [GUIDE/DOCKER_BUILD_GUIDE.md](./GUIDE/DOCKER_BUILD_GUIDE.md): Build optimization
+- [GUIDE/EXPLAIN_GUIDE.md](./GUIDE/EXPLAIN_GUIDE.md): EXPLAIN feature guide
 - [PROFILES.md](./PROFILES.md): Spring profiles configuration

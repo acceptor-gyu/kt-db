@@ -194,7 +194,7 @@ cat api-server/test-data.json
 
 ### 3. 상세 가이드
 
-- **Docker 사용법**: [DOCKER_GUIDE.md](./DOCKER_GUIDE.md)
+- **Docker 사용법**: [DOCKER_GUIDE.md](./GUIDE/DOCKER_GUIDE.md)
 - **API 사용법**: [api-server/API_USAGE.md](./api-server/API_USAGE.md)
 - **테스트 방법**: [api-server/TEST_README.md](./api-server/TEST_README.md)
 

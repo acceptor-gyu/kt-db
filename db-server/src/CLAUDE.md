@@ -17,7 +17,8 @@ main/kotlin/study/db/server/
 │   ├── Resolver.kt                     # SQL 명령 라우팅
 │   ├── SqlParser.kt                    # SQL 파싱 (CREATE, INSERT, SELECT, DELETE 등)
 │   └── dto/
-│       ├── ParsedQuery.kt              # 파싱된 쿼리 DTO
+│       ├── ParsedQuery.kt              # 파싱된 쿼리 DTO (whereString, orderByColumns, limit, offset 포함)
+│       ├── OrderByColumn.kt            # ORDER BY 컬럼 DTO (columnName, ascending)
 │       └── WhereCondition.kt           # WHERE 조건 DTO
 ├── storage/
 │   ├── Constants.kt                    # 스토리지 상수
@@ -53,7 +54,9 @@ test/kotlin/study/db/server/            # 유닛 테스트 및 통합 테스트
 ## 핵심 컴포넌트
 
 - **TableService**: ConcurrentHashMap 기반 스레드 안전 테이블 관리, 디스크 영속성
+  - `select()` 파이프라인: WHERE 필터링 → ORDER BY 정렬 → LIMIT/OFFSET → 컬럼 프로젝션
 - **Storage Layer**: 커스텀 바이너리 포맷, 페이지 기반 버퍼 풀 (16KB, LRU)
 - **Vacuum**: 삭제 마킹된 행을 물리적으로 정리 (MySQL Purge 방식)
-- **SQL Parser**: CREATE, INSERT, SELECT, DELETE, EXPLAIN 파싱
+- **SQL Parser**: CREATE, INSERT, SELECT(WHERE/ORDER BY/LIMIT/OFFSET/컬럼 선택), DELETE, EXPLAIN 파싱
+- **Resolver**: INSERT 타입 검증, SELECT/ORDER BY 컬럼 존재 검증
 - **Elasticsearch**: EXPLAIN 쿼리 실행 계획 분석
