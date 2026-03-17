@@ -1,11 +1,13 @@
 package study.db.server.service
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import study.db.server.db_engine.dto.OrderByColumn
 import study.db.server.exception.ColumnNotFoundException
 import study.db.server.exception.TypeMismatchException
 import study.db.server.exception.UnsupportedTypeException
@@ -997,6 +999,141 @@ class TableServiceTest {
             val result = tableService.select("users", whereString = "id=999")
             assertNotNull(result)
             assertEquals(0, result!!.rows.size)
+        }
+    }
+
+    @Nested
+    @DisplayName("SELECT 컬럼 프로젝션 테스트")
+    inner class SelectColumnProjectionTest {
+
+        @BeforeEach
+        fun setUp() {
+            tableService.createTable("users", mapOf("id" to "INT", "name" to "VARCHAR", "age" to "INT"))
+            tableService.insert("users", mapOf("id" to "1", "name" to "Alice", "age" to "30"))
+            tableService.insert("users", mapOf("id" to "2", "name" to "Bob", "age" to "25"))
+        }
+
+        @Test
+        @DisplayName("특정 컬럼만 SELECT")
+        fun `특정 컬럼만 SELECT`() {
+            val result = tableService.select("users", columns = listOf("name"))
+            assertThat(result!!.rows[0].keys).containsExactly("name")
+            assertThat(result.dataType.keys).containsExactly("name")
+        }
+
+        @Test
+        @DisplayName("SELECT star - 전체 컬럼 반환")
+        fun `SELECT star - 전체 컬럼 반환`() {
+            val result = tableService.select("users", columns = listOf("*"))
+            assertThat(result!!.rows[0].keys).containsExactlyInAnyOrder("id", "name", "age")
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 컬럼 SELECT - 예외 발생")
+        fun `존재하지 않는 컬럼 SELECT - 예외 발생`() {
+            assertThrows<ColumnNotFoundException> {
+                tableService.select("users", columns = listOf("email"))
+            }
+        }
+
+        @Test
+        @DisplayName("WHERE 컬럼과 SELECT 컬럼이 다른 경우 (age로 필터, name만 SELECT)")
+        fun `WHERE 컬럼과 SELECT 컬럼이 다른 경우 (age로 필터, name만 SELECT)`() {
+            val result = tableService.select("users", whereString = "age > 28", columns = listOf("name"))
+            assertThat(result!!.rows).hasSize(1)
+            assertThat(result.rows[0].keys).containsExactly("name")
+            assertThat(result.rows[0]["age"]).isNull()
+        }
+
+        @Test
+        @DisplayName("dataType도 함께 프로젝션되는지 확인")
+        fun `dataType도 함께 프로젝션되는지 확인`() {
+            val result = tableService.select("users", columns = listOf("id", "name"))
+            assertThat(result!!.dataType).isEqualTo(mapOf("id" to "INT", "name" to "VARCHAR"))
+        }
+    }
+
+    @Nested
+    @DisplayName("SELECT ORDER BY 정렬 테스트")
+    inner class SelectOrderByTest {
+
+        @BeforeEach
+        fun setUp() {
+            tableService.createTable("users", mapOf("id" to "INT", "name" to "VARCHAR", "age" to "INT"))
+            tableService.insert("users", mapOf("id" to "1", "name" to "Charlie", "age" to "35"))
+            tableService.insert("users", mapOf("id" to "2", "name" to "Alice", "age" to "25"))
+            tableService.insert("users", mapOf("id" to "3", "name" to "Bob", "age" to "30"))
+        }
+
+        @Test
+        @DisplayName("name ASC 정렬")
+        fun `name ASC 정렬`() {
+            val result = tableService.select("users", orderBy = listOf(OrderByColumn("name", true)))
+            assertThat(result!!.rows.map { it["name"] }).containsExactly("Alice", "Bob", "Charlie")
+        }
+
+        @Test
+        @DisplayName("name DESC 정렬")
+        fun `name DESC 정렬`() {
+            val result = tableService.select("users", orderBy = listOf(OrderByColumn("name", false)))
+            assertThat(result!!.rows.map { it["name"] }).containsExactly("Charlie", "Bob", "Alice")
+        }
+
+        @Test
+        @DisplayName("INT 타입 숫자 순서 정렬 (사전순 아님)")
+        fun `INT 타입 숫자 순서 정렬 (사전순 아님)`() {
+            tableService.createTable("nums", mapOf("val" to "INT"))
+            tableService.insert("nums", mapOf("val" to "3"))
+            tableService.insert("nums", mapOf("val" to "100"))
+            tableService.insert("nums", mapOf("val" to "25"))
+            val result = tableService.select("nums", orderBy = listOf(OrderByColumn("val", true)))
+            assertThat(result!!.rows.map { it["val"] }).containsExactly("3", "25", "100")
+        }
+
+        @Test
+        @DisplayName("다중 컬럼 정렬 (name ASC, age DESC)")
+        fun `다중 컬럼 정렬 (name ASC, age DESC)`() {
+            tableService.insert("users", mapOf("id" to "4", "name" to "Alice", "age" to "20"))
+            val result = tableService.select("users",
+                orderBy = listOf(OrderByColumn("name", true), OrderByColumn("age", false))
+            )
+            // Alice 중 age DESC: 25 먼저, 20 나중
+            assertThat(result!!.rows[0]["name"]).isEqualTo("Alice")
+            assertThat(result.rows[0]["age"]).isEqualTo("25")
+            assertThat(result.rows[1]["age"]).isEqualTo("20")
+        }
+
+        @Test
+        @DisplayName("ORDER BY 없음 - 삽입 순서 유지")
+        fun `ORDER BY 없음 - 삽입 순서 유지`() {
+            val result = tableService.select("users")
+            assertThat(result!!.rows.map { it["id"] }).containsExactly("1", "2", "3")
+        }
+
+        @Test
+        @DisplayName("WHERE + ORDER BY 조합")
+        fun `WHERE + ORDER BY 조합`() {
+            val result = tableService.select("users",
+                whereString = "age > 25",
+                orderBy = listOf(OrderByColumn("name", true))
+            )
+            // age>25: Charlie(35), Bob(30) → name ASC: Bob, Charlie
+            assertThat(result!!.rows.map { it["name"] }).containsExactly("Bob", "Charlie")
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 컬럼 ORDER BY - 예외 발생")
+        fun `존재하지 않는 컬럼 ORDER BY - 예외 발생`() {
+            assertThrows<ColumnNotFoundException> {
+                tableService.select("users", orderBy = listOf(OrderByColumn("email", true)))
+            }
+        }
+
+        @Test
+        @DisplayName("VARCHAR 사전순 정렬 확인")
+        fun `VARCHAR 사전순 정렬 확인`() {
+            val result = tableService.select("users", orderBy = listOf(OrderByColumn("name", true)))
+            assertThat(result!!.rows.map { it["name"] }).isSortedAccordingTo(compareBy { it })
         }
     }
 }

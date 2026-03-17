@@ -6,6 +6,7 @@ import study.db.common.Table
 import study.db.common.where.WhereClause
 import study.db.common.where.WhereEvaluator
 import study.db.server.db_engine.Resolver
+import study.db.server.db_engine.dto.OrderByColumn
 import study.db.server.exception.ColumnNotFoundException
 import study.db.server.storage.TableFileManager
 import java.util.concurrent.ConcurrentHashMap
@@ -205,29 +206,85 @@ class TableService(
     /**
      * 테이블 조회 (Thread-safe, Disk-based for full table scan)
      *
-     * Full table scan: 파일에서 직접 읽어서 최신 데이터 보장
+     * 실행 파이프라인: WHERE 필터링 → ORDER BY 정렬 → 컬럼 프로젝션
      * - tableFileManager가 있으면 디스크에서 읽기
      * - 없으면 메모리 캐시에서 읽기 (fallback)
-     * - whereString이 있으면 WHERE 조건 필터링 적용
      *
      * @param tableName 테이블 이름
      * @param whereString WHERE 절 문자열 (null이면 전체 반환)
+     * @param columns 조회할 컬럼 목록 (null 또는 ["*"]이면 전체 컬럼 반환)
+     * @param orderBy ORDER BY 컬럼 목록 (null이면 삽입 순서 유지)
      * @return Table 객체 또는 null
-     * @throws ColumnNotFoundException WHERE 조건에 존재하지 않는 컬럼이 사용됐을 때
+     * @throws ColumnNotFoundException WHERE 조건, 컬럼 목록, ORDER BY에 존재하지 않는 컬럼이 사용됐을 때
      */
-    fun select(tableName: String, whereString: String? = null): Table? {
+    fun select(
+        tableName: String,
+        whereString: String? = null,
+        columns: List<String>? = null,
+        orderBy: List<OrderByColumn>? = null
+    ): Table? {
         // 디스크에서 최신 데이터 읽기 (full table scan)
         val table = tableFileManager?.readTable(tableName) ?: tables[tableName] ?: return null
 
-        if (whereString == null) return table
-
-        val whereClause = WhereClause.parse(whereString)
-        validateWhereColumns(table, whereClause)
-
-        val filteredRows = table.rows.filter { row ->
-            WhereEvaluator.matches(Row(data = row), whereClause, table.dataType)
+        // 1. WHERE 필터링
+        val filteredRows = if (whereString == null) {
+            table.rows
+        } else {
+            val whereClause = WhereClause.parse(whereString)
+            validateWhereColumns(table, whereClause)
+            table.rows.filter { row ->
+                WhereEvaluator.matches(Row(data = row), whereClause, table.dataType)
+            }
         }
-        return table.copy(rows = filteredRows)
+
+        // 2. ORDER BY 정렬 (프로젝션 전 - 정렬 컬럼이 SELECT 컬럼에 없을 수 있으므로)
+        val sortedRows = if (orderBy.isNullOrEmpty()) {
+            filteredRows
+        } else {
+            Resolver.validateOrderByColumns(table, orderBy)
+            filteredRows.sortedWith(
+                Comparator { row1, row2 ->
+                    for (col in orderBy) {
+                        val v1 = row1[col.columnName] ?: ""
+                        val v2 = row2[col.columnName] ?: ""
+                        val colType = table.dataType[col.columnName]?.uppercase() ?: "VARCHAR"
+                        val cmp = compareByType(v1, v2, colType)
+                        if (cmp != 0) return@Comparator if (col.ascending) cmp else -cmp
+                    }
+                    0
+                }
+            )
+        }
+
+        // 3. 컬럼 프로젝션 (ORDER BY 후)
+        if (columns == null || columns == listOf("*")) {
+            return table.copy(rows = sortedRows)
+        }
+
+        Resolver.validateSelectColumns(table, columns)
+
+        val projectedRows = sortedRows.map { row ->
+            row.filterKeys { it in columns }
+        }
+        val projectedDataType = table.dataType.filterKeys { it in columns }
+
+        return table.copy(rows = projectedRows, dataType = projectedDataType)
+    }
+
+    /**
+     * 컬럼 타입에 따른 값 비교
+     *
+     * @param left 왼쪽 값
+     * @param right 오른쪽 값
+     * @param columnType 컬럼 타입 (대문자)
+     * @return 음수: left < right, 0: 같음, 양수: left > right
+     */
+    private fun compareByType(left: String, right: String, columnType: String): Int {
+        return when (columnType) {
+            "INT" -> (left.toIntOrNull() ?: 0).compareTo(right.toIntOrNull() ?: 0)
+            "TIMESTAMP" -> (left.toLongOrNull() ?: 0L).compareTo(right.toLongOrNull() ?: 0L)
+            else -> left.compareTo(right)
+        }
     }
 
     /**
