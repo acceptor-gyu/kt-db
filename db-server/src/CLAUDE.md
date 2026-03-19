@@ -69,7 +69,7 @@ test/kotlin/study/db/server/            # 유닛 테스트 및 통합 테스트
 | INSERT | 완료 | 완료 |
 | SELECT | 완료 | 완료 |
 | DELETE | 완료 | 완료 |
-| UPDATE | 완료 (Phase 2 Step 1) | TODO (Step 3, 4) — 검증 완료 (Step 2) |
+| UPDATE | 완료 (Phase 2 Step 1) | TableFileManager.updateRows() 완료 (Step 3) — TableService 연동 TODO (Step 4) |
 
 ### UPDATE 파싱 규칙 (ConnectionHandler.kt)
 - 정규식: `UPDATE\s+(\w+)\s+SET\s+(.+?)(?:\s+WHERE\s+(.+))?$`
