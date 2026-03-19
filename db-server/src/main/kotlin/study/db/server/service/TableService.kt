@@ -10,6 +10,8 @@ import study.db.server.db_engine.dto.OrderByColumn
 import study.db.server.exception.ColumnNotFoundException
 import study.db.server.storage.TableFileManager
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 
 /**
  * TableService - Thread-safe 테이블 관리 서비스
@@ -33,6 +35,17 @@ class TableService(
      * - Value: Table 객체 (immutable copy 사용)
      */
     private val tables = ConcurrentHashMap<String, Table>()
+
+    /**
+     * 테이블 단위 락 저장소 (Thread-safe)
+     * - UPDATE 연산 시 테이블 단위로 락을 획득하여 동시성 제어
+     */
+    private val tableLocks = ConcurrentHashMap<String, ReentrantLock>()
+
+    private fun <T> withTableLock(tableName: String, block: () -> T): T {
+        val lock = tableLocks.computeIfAbsent(tableName) { ReentrantLock() }
+        return lock.withLock(block)
+    }
 
     init {
         // 파일에서 테이블 로드
@@ -364,8 +377,56 @@ class TableService(
      * @return 업데이트된 행 개수
      */
     fun update(tableName: String, setValues: Map<String, String>, whereString: String?): Int {
-        // TODO: Step 3, 4에서 구현 예정
-        throw UnsupportedOperationException("UPDATE not yet implemented")
+        // 1. 테이블 존재 여부 확인
+        val existingTable = tables[tableName]
+            ?: throw IllegalStateException("Table '$tableName' not found")
+
+        // 2. SET 컬럼 존재 여부 및 타입 검증
+        Resolver.validateUpdateData(existingTable, setValues)
+
+        // 3. WHERE 조건 파싱 (null이면 전체 업데이트)
+        val whereClause = WhereClause.parse(whereString)
+
+        // 4. WHERE 조건 컬럼 존재 검증
+        validateWhereColumns(existingTable, whereClause)
+
+        // 5. 테이블 단위 락으로 감싸서 updateRows 호출
+        return withTableLock(tableName) {
+            if (tableFileManager != null) {
+                // 파일 기반: TableFileManager.updateRows 사용
+                val updatedCount = tableFileManager.updateRows(
+                    tableName,
+                    existingTable.dataType,
+                    setValues,
+                    whereClause
+                )
+
+                // 메모리 테이블 업데이트 (업데이트된 데이터 반영)
+                tableFileManager.readTable(tableName)?.let { updatedTable ->
+                    tables[tableName] = updatedTable
+                }
+
+                updatedCount
+            } else {
+                // 메모리 기반: 물리적 업데이트 (테스트용)
+                var updatedCount = 0
+                tables.compute(tableName) { _, table ->
+                    table?.let {
+                        val newRows = it.rows.map { row ->
+                            val rowObj = Row(data = row)
+                            if (WhereEvaluator.matches(rowObj, whereClause, it.dataType)) {
+                                updatedCount++
+                                row + setValues  // 기존 row에 setValues 덮어쓰기
+                            } else {
+                                row
+                            }
+                        }
+                        it.copy(rows = newRows)
+                    }
+                }
+                updatedCount
+            }
+        }
     }
 
     /**

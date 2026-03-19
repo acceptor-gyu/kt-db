@@ -69,10 +69,15 @@ test/kotlin/study/db/server/            # 유닛 테스트 및 통합 테스트
 | INSERT | 완료 | 완료 |
 | SELECT | 완료 | 완료 |
 | DELETE | 완료 | 완료 |
-| UPDATE | 완료 (Phase 2 Step 1) | TableFileManager.updateRows() 완료 (Step 3) — TableService 연동 TODO (Step 4) |
+| UPDATE | 완료 (Phase 2 Step 1) | 완료 (Phase 2 Step 4) |
 
-### UPDATE 파싱 규칙 (ConnectionHandler.kt)
-- 정규식: `UPDATE\s+(\w+)\s+SET\s+(.+?)(?:\s+WHERE\s+(.+))?$`
+### UPDATE 구현 상세 (Phase 2 완료)
+- **파싱/라우팅** (ConnectionHandler.kt): 정규식 `UPDATE\s+(\w+)\s+SET\s+(.+?)(?:\s+WHERE\s+(.+))?$`
+- **타입 검증** (Resolver.kt): `validateUpdateData()` — SET 컬럼 존재 및 타입 검증
+- **파일 업데이트** (TableFileManager.kt): `updateRows()` — WhereEvaluator로 조건 필터링 후 version +1, data 덮어쓰기
+- **서비스 연동** (TableService.kt): `update()` — 테이블 단위 `ReentrantLock`으로 동시성 제어
+  - `withTableLock(tableName)` 헬퍼로 락 획득 후 `tableFileManager.updateRows()` 호출
+  - 업데이트 후 메모리 캐시(`tables`)를 디스크에서 다시 읽어 동기화
+  - 파일 매니저 없는 경우(테스트용): 메모리 내 row를 직접 setValues로 덮어쓰기
 - SET 값: `"val"`, `'val'`, 따옴표 없는 `val` 모두 지원
-- WHERE 절 없으면 전체 행 업데이트 (whereString = null)
-- TableService.update() stub 호출 → 실제 구현은 Step 3, 4에서 완료 예정
+- WHERE 절 없으면 전체 행 업데이트 (whereString = null → `WhereClause.None`)
