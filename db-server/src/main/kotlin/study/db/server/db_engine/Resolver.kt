@@ -82,6 +82,20 @@ object Resolver {
     }
 
     /**
+     * UPDATE SET 데이터 일괄 검증
+     *
+     * @param table 대상 테이블
+     * @param setValues SET 절의 데이터 (컬럼명 -> 값)
+     * @throws ColumnNotFoundException 정의되지 않은 컬럼
+     * @throws TypeMismatchException 타입 불일치
+     */
+    fun validateUpdateData(table: Table, setValues: Map<String, String>) {
+        setValues.forEach { (columnName, value) ->
+            validateColumnType(table, columnName, value)
+        }
+    }
+
+    /**
      * SELECT 컬럼 존재 여부 확인
      *
      * @param table 대상 테이블

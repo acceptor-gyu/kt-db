@@ -58,7 +58,7 @@ test/kotlin/study/db/server/            # 유닛 테스트 및 통합 테스트
 - **Storage Layer**: 커스텀 바이너리 포맷, 페이지 기반 버퍼 풀 (16KB, LRU)
 - **Vacuum**: 삭제 마킹된 행을 물리적으로 정리 (MySQL Purge 방식)
 - **SQL Parser**: CREATE, INSERT, SELECT(WHERE/ORDER BY/LIMIT/OFFSET/컬럼 선택), DELETE, UPDATE, EXPLAIN 파싱
-- **Resolver**: INSERT 타입 검증, SELECT/ORDER BY 컬럼 존재 검증
+- **Resolver**: INSERT/UPDATE 타입 검증, SELECT/ORDER BY 컬럼 존재 검증
 - **Elasticsearch**: EXPLAIN 쿼리 실행 계획 분석
 
 ## DML 구현 현황
@@ -69,7 +69,7 @@ test/kotlin/study/db/server/            # 유닛 테스트 및 통합 테스트
 | INSERT | 완료 | 완료 |
 | SELECT | 완료 | 완료 |
 | DELETE | 완료 | 완료 |
-| UPDATE | 완료 (Phase 2 Step 1) | TODO (Step 3, 4) |
+| UPDATE | 완료 (Phase 2 Step 1) | TODO (Step 3, 4) — 검증 완료 (Step 2) |
 
 ### UPDATE 파싱 규칙 (ConnectionHandler.kt)
 - 정규식: `UPDATE\s+(\w+)\s+SET\s+(.+?)(?:\s+WHERE\s+(.+))?$`
