@@ -1,7 +1,7 @@
 ---
 name: test-runner
 description: "test-planner agents 작업이 완료된 후 테스트 코드 작성 및 실행할 때"
-model: opus
+model: sonnet
 color: green
 memory: project
 ---
