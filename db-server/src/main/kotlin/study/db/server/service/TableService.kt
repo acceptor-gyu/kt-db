@@ -129,6 +129,34 @@ class TableService(
     }
 
     /**
+     * 다중 행 데이터 삽입 (Thread-safe, single file write)
+     *
+     * 모든 행 검증을 compute 전에 완료하여 원자성 보장.
+     * 단일 writeTable 호출로 I/O 최소화.
+     *
+     * @param tableName 테이블 이름
+     * @param rows 삽입할 데이터 목록
+     * @throws IllegalStateException 테이블이 존재하지 않을 때
+     * @throws ColumnNotFoundException 컬럼이 정의되지 않았을 때
+     * @throws TypeMismatchException 타입이 일치하지 않을 때
+     */
+    fun insertBatch(tableName: String, rows: List<Map<String, String>>) {
+        val existingTable = tables[tableName]
+            ?: throw IllegalStateException("Table '$tableName' not found")
+
+        // 모든 행 검증 먼저 (원자성 보장)
+        rows.forEach { validateInsertData(existingTable, it) }
+
+        // atomic compute로 일괄 추가
+        val updated = tables.compute(tableName) { _, table ->
+            table?.copy(rows = table.rows + rows)
+        }
+
+        // 파일에 한 번만 쓰기 (I/O 최소화)
+        updated?.let { tableFileManager?.writeTable(it) }
+    }
+
+    /**
      * INSERT 데이터 검증
      *
      * Resolver를 통해 컬럼 존재 여부 및 타입 검증 수행

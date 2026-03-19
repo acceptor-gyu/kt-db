@@ -66,7 +66,8 @@ test/kotlin/study/db/server/            # 유닛 테스트 및 통합 테스트
 | 명령어 | 파싱/라우팅 | 실행 로직 |
 |--------|------------|-----------|
 | CREATE TABLE | 완료 | 완료 |
-| INSERT | 완료 | 완료 |
+| INSERT (단일) | 완료 | 완료 |
+| INSERT (다중 VALUES) | 완료 (Phase 2 Step 5~6) | 완료 (Phase 2 Step 5~6) |
 | SELECT | 완료 | 완료 |
 | DELETE | 완료 | 완료 |
 | UPDATE | 완료 (Phase 2 Step 1) | 완료 (Phase 2 Step 4) |
@@ -81,3 +82,11 @@ test/kotlin/study/db/server/            # 유닛 테스트 및 통합 테스트
   - 파일 매니저 없는 경우(테스트용): 메모리 내 row를 직접 setValues로 덮어쓰기
 - SET 값: `"val"`, `'val'`, 따옴표 없는 `val` 모두 지원
 - WHERE 절 없으면 전체 행 업데이트 (whereString = null → `WhereClause.None`)
+
+### INSERT 다중 행 구현 상세 (Phase 2 Step 5~6)
+- **파싱** (ConnectionHandler.kt): 정규식 `INSERT\s+INTO\s+(\w+)\s+VALUES\s*(.+)` 로 VALUES 전체 문자열 추출
+- **그룹 분리** (`extractValueGroups()`): 상태 기반 토크나이저 — 따옴표 내 콤마/괄호 무시하고 `(...)` 단위로 분리
+- **행 파싱** (`parseRowValues()`): 기존 valueRegex 패턴으로 `col=val` 파싱 → `Map<String, String>`
+- **단일 행**: `tableService.insert()` 호출, 응답 `"Data inserted"`
+- **다중 행**: `tableService.insertBatch()` 호출, 응답 `"Data inserted (N rows)"`
+- **insertBatch** (TableService.kt): 전체 행 검증 후 `compute()`로 일괄 추가, `writeTable()` 1회 호출로 I/O 최소화
