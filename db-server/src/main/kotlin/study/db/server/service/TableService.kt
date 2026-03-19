@@ -352,6 +352,23 @@ class TableService(
     }
 
     /**
+     * 데이터 업데이트 (Thread-safe)
+     *
+     * WHERE 조건에 맞는 행의 SET 컬럼 값을 업데이트합니다.
+     *
+     * TODO: Step 3, 4에서 구현 예정
+     *
+     * @param tableName 테이블 이름
+     * @param setValues 업데이트할 컬럼명 -> 값 매핑
+     * @param whereString WHERE 조건 문자열 (null이면 전체 업데이트)
+     * @return 업데이트된 행 개수
+     */
+    fun update(tableName: String, setValues: Map<String, String>, whereString: String?): Int {
+        // TODO: Step 3, 4에서 구현 예정
+        throw UnsupportedOperationException("UPDATE not yet implemented")
+    }
+
+    /**
      * VacuumService 설정 (Setter injection for circular dependency)
      */
     fun setVacuumService(service: study.db.server.vacuum.VacuumService) {

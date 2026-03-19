@@ -318,6 +318,7 @@ class ConnectionHandler(
             trimmedSql.startsWith("SELECT", ignoreCase = true) -> parseAndHandleSelect(trimmedSql)
             trimmedSql.startsWith("DELETE", ignoreCase = true) -> parseAndHandleDelete(trimmedSql)
             trimmedSql.startsWith("DROP TABLE", ignoreCase = true) -> parseAndHandleDropTable(trimmedSql)
+            trimmedSql.startsWith("UPDATE", ignoreCase = true) -> parseAndHandleUpdate(trimmedSql)
             trimmedSql.startsWith("VACUUM", ignoreCase = true) -> parseAndHandleVacuum(trimmedSql)
             trimmedSql.startsWith("EXPLAIN", ignoreCase = true) -> parseAndHandleExplain(trimmedSql)
             else -> DbResponse(success = false, message = "Unsupported SQL query: $sql", errorCode = 400)
@@ -480,6 +481,44 @@ class ConnectionHandler(
                 message = "Query plan generated successfully",
                 data = queryPlanJson
             )
+        }
+    }
+
+    /**
+     * UPDATE users SET name='Bob' WHERE id=1
+     * UPDATE users SET age=25, status='active'
+     * UPDATE users SET name='Alice'  -- WHERE 없이 전체 업데이트
+     */
+    private fun parseAndHandleUpdate(sql: String): DbResponse {
+        val regex = Regex("""UPDATE\s+(\w+)\s+SET\s+(.+?)(?:\s+WHERE\s+(.+))?$""", RegexOption.IGNORE_CASE)
+        val match = regex.find(sql)
+            ?: return DbResponse(success = false, message = "Invalid UPDATE syntax: $sql", errorCode = 400)
+
+        val tableName = match.groupValues[1]
+        val setPart = match.groupValues[2]
+        val whereString = match.groupValues[3].trim().ifEmpty { null }
+
+        // SET 절 파싱: col=val 쌍을 Map으로 추출
+        // "val", 'val', 또는 따옴표 없는 val 형태 모두 지원
+        val setValues = mutableMapOf<String, String>()
+        val valueRegex = Regex("""(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s,]+))""")
+        valueRegex.findAll(setPart).forEach { valueMatch ->
+            val columnName = valueMatch.groupValues[1]
+            val value = valueMatch.groupValues[2].ifEmpty {
+                valueMatch.groupValues[3].ifEmpty {
+                    valueMatch.groupValues[4]
+                }
+            }
+            setValues[columnName] = value
+        }
+
+        if (setValues.isEmpty()) {
+            return DbResponse(success = false, message = "Invalid UPDATE syntax: no SET values found in: $sql", errorCode = 400)
+        }
+
+        return ExceptionMapper.executeWithExceptionHandling(connectionId) {
+            val updatedCount = tableService.update(tableName, setValues, whereString)
+            DbResponse(success = true, message = "Updated $updatedCount row(s)")
         }
     }
 

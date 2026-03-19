@@ -57,6 +57,22 @@ test/kotlin/study/db/server/            # 유닛 테스트 및 통합 테스트
   - `select()` 파이프라인: WHERE 필터링 → ORDER BY 정렬 → LIMIT/OFFSET → 컬럼 프로젝션
 - **Storage Layer**: 커스텀 바이너리 포맷, 페이지 기반 버퍼 풀 (16KB, LRU)
 - **Vacuum**: 삭제 마킹된 행을 물리적으로 정리 (MySQL Purge 방식)
-- **SQL Parser**: CREATE, INSERT, SELECT(WHERE/ORDER BY/LIMIT/OFFSET/컬럼 선택), DELETE, EXPLAIN 파싱
+- **SQL Parser**: CREATE, INSERT, SELECT(WHERE/ORDER BY/LIMIT/OFFSET/컬럼 선택), DELETE, UPDATE, EXPLAIN 파싱
 - **Resolver**: INSERT 타입 검증, SELECT/ORDER BY 컬럼 존재 검증
 - **Elasticsearch**: EXPLAIN 쿼리 실행 계획 분석
+
+## DML 구현 현황
+
+| 명령어 | 파싱/라우팅 | 실행 로직 |
+|--------|------------|-----------|
+| CREATE TABLE | 완료 | 완료 |
+| INSERT | 완료 | 완료 |
+| SELECT | 완료 | 완료 |
+| DELETE | 완료 | 완료 |
+| UPDATE | 완료 (Phase 2 Step 1) | TODO (Step 3, 4) |
+
+### UPDATE 파싱 규칙 (ConnectionHandler.kt)
+- 정규식: `UPDATE\s+(\w+)\s+SET\s+(.+?)(?:\s+WHERE\s+(.+))?$`
+- SET 값: `"val"`, `'val'`, 따옴표 없는 `val` 모두 지원
+- WHERE 절 없으면 전체 행 업데이트 (whereString = null)
+- TableService.update() stub 호출 → 실제 구현은 Step 3, 4에서 완료 예정
