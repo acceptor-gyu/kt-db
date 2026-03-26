@@ -210,6 +210,47 @@ ConnectionHandlerTest.kt (기존 파일 확장 또는 신규)
 
 ---
 
+## 구현 현황
+
+### 완료된 테스트
+
+| 우선순위 | ID | 파일 | 상태 |
+|---------|----|------|------|
+| critical | U-01 ~ U-05 | `TableServiceTest.kt` > `UpdateTest` | ✅ 완료 |
+| critical | B-01 ~ B-03 | `TableServiceTest.kt` > `InsertBatchTest` | ✅ 완료 |
+| high | U-06 ~ U-09 | `TableServiceTest.kt` > `UpdateTest` | ✅ 완료 |
+| high | B-04, B-05 | `TableServiceTest.kt` > `InsertBatchTest` | ✅ 완료 |
+| high | UP-01, UP-02 | `TableServicePersistenceTest.kt` > `UpdatePersistenceTest` | ✅ 완료 |
+| high | BP-01, BP-02 | `TableServicePersistenceTest.kt` > `InsertBatchPersistenceTest` | ✅ 완료 |
+| high | SP-07 ~ SP-10 | `ConnectionHandlerTest.kt` > `InsertBatchParsingTest` | ✅ 완료 |
+| medium | UP-03, UP-04 | `TableServicePersistenceTest.kt` > `UpdatePersistenceTest` | ✅ 완료 |
+| medium | BP-03 | `TableServicePersistenceTest.kt` > `InsertBatchPersistenceTest` | ✅ 완료 |
+| medium | SP-01 ~ SP-06 | `ConnectionHandlerTest.kt` > `UpdateParsingTest` | ✅ 완료 |
+| medium | SP-11 | `ConnectionHandlerTest.kt` > `InsertBatchParsingTest` | ✅ 완료 |
+| low | SP-12 | `ConnectionHandlerTest.kt` > `InsertBatchParsingTest` | ✅ 완료 |
+| low | B-06 | `TableServiceTest.kt` > `InsertBatchTest` | ✅ 완료 |
+
+### 구현 중 발견된 버그 수정
+
+| 버그 | 원인 | 수정 내용 |
+|------|------|-----------|
+| SP-06: `UPDATE users SET WHERE id=1` → 400 응답 안 됨 | regex lazy matching이 `WHERE id=1`을 SET 절로 캡처, `id=1`이 set value로 추출됨 | `ConnectionHandler.parseAndHandleUpdate()`에 `setPart.trim().startsWith("WHERE")` 체크 추가 |
+
+### 파싱 테스트 구현 방식
+
+`ConnectionHandlerTest.kt`의 SQL 파싱 테스트는 reflection으로 `private processRequest(sql)` 메서드를 직접 호출하는 헬퍼를 사용한다.
+
+```kotlin
+private fun processRequest(sql: String): DbResponse {
+    val handler = createHandler(serverSideSocket)
+    val method = ConnectionHandler::class.java.getDeclaredMethod("processRequest", String::class.java)
+    method.isAccessible = true
+    return method.invoke(handler, sql) as DbResponse
+}
+```
+
+---
+
 ## 작성 패턴 (기존 코드 기준)
 
 ```kotlin

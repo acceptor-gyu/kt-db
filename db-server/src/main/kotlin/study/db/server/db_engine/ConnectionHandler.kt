@@ -582,7 +582,7 @@ class ConnectionHandler(
             setValues[columnName] = value
         }
 
-        if (setValues.isEmpty()) {
+        if (setValues.isEmpty() || setPart.trim().startsWith("WHERE", ignoreCase = true)) {
             return DbResponse(success = false, message = "Invalid UPDATE syntax: no SET values found in: $sql", errorCode = 400)
         }
 

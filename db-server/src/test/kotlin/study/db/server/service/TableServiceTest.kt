@@ -1280,6 +1280,53 @@ class TableServiceTest {
                 tableService.update("users", mapOf("id" to "not-a-number"), null)
             }
         }
+
+        @Test
+        @DisplayName("U-06: WHERE 절에 존재하지 않는 컬럼 시 ColumnNotFoundException")
+        fun updateThrowsColumnNotFoundExceptionWhenWhereColumnDoesNotExistTest() {
+            assertThrows<ColumnNotFoundException> {
+                tableService.update("users", mapOf("name" to "B"), "age=25")
+            }
+        }
+
+        @Test
+        @DisplayName("U-07: 존재하지 않는 테이블 UPDATE 시 IllegalStateException")
+        fun updateThrowsIllegalStateExceptionWhenTableDoesNotExistTest() {
+            assertThrows<IllegalStateException> {
+                tableService.update("nonexistent", mapOf("name" to "X"), null)
+            }
+        }
+
+        @Test
+        @DisplayName("U-08: 복수 컬럼 동시 UPDATE")
+        fun updateMultipleColumnsSimultaneouslyTest() {
+            tableService.createTable("products", mapOf("id" to "INT", "name" to "VARCHAR", "price" to "INT"))
+            tableService.insert("products", mapOf("id" to "1", "name" to "Old", "price" to "100"))
+
+            val updatedCount = tableService.update("products", mapOf("name" to "New", "price" to "999"), "id=1")
+
+            assertEquals(1, updatedCount)
+            val row = tableService.select("products")!!.rows.first()
+            assertEquals("New", row["name"])
+            assertEquals("999", row["price"])
+        }
+
+        @Test
+        @DisplayName("U-09: 복수 행이 WHERE에 매칭될 때 매칭 수 반환")
+        fun updateReturnsCountOfAllMatchingRowsTest() {
+            tableService.createTable("items", mapOf("id" to "INT", "status" to "VARCHAR"))
+            tableService.insert("items", mapOf("id" to "1", "status" to "active"))
+            tableService.insert("items", mapOf("id" to "2", "status" to "active"))
+            tableService.insert("items", mapOf("id" to "3", "status" to "active"))
+            tableService.insert("items", mapOf("id" to "4", "status" to "inactive"))
+
+            val updatedCount = tableService.update("items", mapOf("status" to "done"), "status=active")
+
+            assertEquals(3, updatedCount)
+            val rows = tableService.select("items")!!.rows
+            assertEquals(3, rows.count { it["status"] == "done" })
+            assertEquals(1, rows.count { it["status"] == "inactive" })
+        }
     }
 
     @Nested
@@ -1337,6 +1384,48 @@ class TableServiceTest {
             }
             val result = tableService.select("users")!!.rows
             assertEquals(0, result.size)
+        }
+
+        @Test
+        @DisplayName("B-04: 원자성 — 존재하지 않는 컬럼 포함 시 전체 실패")
+        fun insertBatchRollsBackAllRowsWhenAnyRowHasUnknownColumnTest() {
+            val rows = listOf(
+                mapOf("id" to "1", "name" to "Alice"),
+                mapOf("id" to "2", "name" to "Bob", "unknown_col" to "x"),
+            )
+
+            assertThrows<ColumnNotFoundException> {
+                tableService.insertBatch("users", rows)
+            }
+            val result = tableService.select("users")!!.rows
+            assertEquals(0, result.size)
+        }
+
+        @Test
+        @DisplayName("B-05: 존재하지 않는 테이블 insertBatch 시 IllegalStateException")
+        fun insertBatchThrowsIllegalStateExceptionWhenTableDoesNotExistTest() {
+            val rows = listOf(mapOf("id" to "1", "name" to "Alice"))
+            assertThrows<IllegalStateException> {
+                tableService.insertBatch("nonexistent", rows)
+            }
+        }
+
+        @Test
+        @DisplayName("B-06: 단일 insert + insertBatch 혼합 후 데이터 일관성")
+        fun insertBatchMaintainsConsistencyAfterMixedInsertOperationsTest() {
+            tableService.insert("users", mapOf("id" to "1", "name" to "Alice"))
+
+            val batchRows = listOf(
+                mapOf("id" to "2", "name" to "Bob"),
+                mapOf("id" to "3", "name" to "Charlie"),
+            )
+            tableService.insertBatch("users", batchRows)
+
+            val result = tableService.select("users")!!.rows
+            assertEquals(3, result.size)
+            assertEquals("Alice", result[0]["name"])
+            assertEquals("Bob", result[1]["name"])
+            assertEquals("Charlie", result[2]["name"])
         }
     }
 }

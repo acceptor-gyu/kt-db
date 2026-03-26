@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.*
+import study.db.common.protocol.DbResponse
 import study.db.common.protocol.ProtocolCodec
 import study.db.server.service.TableService
 import java.io.DataInputStream
@@ -45,6 +46,16 @@ class ConnectionHandlerTest {
             connectionManager = null,
             explainService = null  // EXPLAIN 기능은 테스트에서 제외
         )
+    }
+
+    /**
+     * ConnectionHandler.processRequest()를 reflection으로 직접 호출하는 헬퍼
+     */
+    private fun processRequest(sql: String): DbResponse {
+        val handler = createHandler(serverSideSocket)
+        val method = ConnectionHandler::class.java.getDeclaredMethod("processRequest", String::class.java)
+        method.isAccessible = true
+        return method.invoke(handler, sql) as DbResponse
     }
 
     /**
@@ -318,6 +329,151 @@ class ConnectionHandlerTest {
             // Then: 요청이 정상적으로 복원됨
             assertEquals(sql, decoded)
             assertTrue(decoded.startsWith("INSERT INTO"))
+        }
+    }
+
+    @Nested
+    @DisplayName("UPDATE SQL 파싱 테스트")
+    inner class UpdateParsingTest {
+
+        @BeforeEach
+        fun setupTable() {
+            sharedTableService.createTable("users", mapOf("id" to "INT", "name" to "VARCHAR", "age" to "INT"))
+            sharedTableService.insert("users", mapOf("id" to "1", "name" to "Alice", "age" to "30"))
+            sharedTableService.insert("users", mapOf("id" to "2", "name" to "Bob", "age" to "25"))
+        }
+
+        @Test
+        @DisplayName("SP-01: WHERE 조건 포함 UPDATE - 성공 응답")
+        fun `UPDATE with WHERE clause returns success response`() {
+            val response = processRequest("UPDATE users SET name='Bob' WHERE id=1")
+
+            assertTrue(response.success)
+            assertTrue(response.message!!.startsWith("Updated"))
+            assertTrue(response.message!!.contains("row(s)"))
+        }
+
+        @Test
+        @DisplayName("SP-02: WHERE 없는 UPDATE - whereString=null 처리, 성공")
+        fun `UPDATE without WHERE updates all rows successfully`() {
+            val response = processRequest("UPDATE users SET name='Everyone'")
+
+            assertTrue(response.success)
+            assertEquals(2, sharedTableService.select("users")!!.rows.count { it["name"] == "Everyone" })
+        }
+
+        @Test
+        @DisplayName("SP-03: 복수 컬럼 SET 파싱")
+        fun `UPDATE with multiple SET columns parses all values`() {
+            val response = processRequest("UPDATE users SET name='Alice', age=30 WHERE id=1")
+
+            assertTrue(response.success)
+            val row = sharedTableService.select("users", whereString = "id=1")!!.rows.first()
+            assertEquals("Alice", row["name"])
+            assertEquals("30", row["age"])
+        }
+
+        @Test
+        @DisplayName("SP-04: 쌍따옴표 값 정상 파싱")
+        fun `UPDATE with double-quoted value parses correctly`() {
+            val response = processRequest("UPDATE users SET name=\"double\" WHERE id=1")
+
+            assertTrue(response.success)
+            val row = sharedTableService.select("users", whereString = "id=1")!!.rows.first()
+            assertEquals("double", row["name"])
+        }
+
+        @Test
+        @DisplayName("SP-05: 테이블명 누락 구문은 400 응답")
+        fun `UPDATE without table name returns 400 error`() {
+            val response = processRequest("UPDATE SET name='x'")
+
+            assertFalse(response.success)
+            assertEquals(400, response.errorCode)
+        }
+
+        @Test
+        @DisplayName("SP-06: SET 절 비어있는 구문은 400 응답")
+        fun `UPDATE with empty SET clause returns 400 error`() {
+            val response = processRequest("UPDATE users SET WHERE id=1")
+
+            assertFalse(response.success)
+            assertEquals(400, response.errorCode)
+        }
+    }
+
+    @Nested
+    @DisplayName("INSERT 다중 행 SQL 파싱 테스트")
+    inner class InsertBatchParsingTest {
+
+        @BeforeEach
+        fun setupTable() {
+            sharedTableService.createTable("users", mapOf("id" to "INT", "name" to "VARCHAR"))
+        }
+
+        @Test
+        @DisplayName("SP-07: 다중 행 INSERT - 성공 응답과 행 수 포함")
+        fun `INSERT with multiple value groups returns Data inserted N rows message`() {
+            val response = processRequest("INSERT INTO users VALUES (id=1, name='A'), (id=2, name='B')")
+
+            assertTrue(response.success)
+            assertEquals("Data inserted (2 rows)", response.message)
+        }
+
+        @Test
+        @DisplayName("SP-08: 단일 행 INSERT - Data inserted 응답 (regression)")
+        fun `INSERT with single value group returns Data inserted message`() {
+            val response = processRequest("INSERT INTO users VALUES (id=1, name='A')")
+
+            assertTrue(response.success)
+            assertEquals("Data inserted", response.message)
+        }
+
+        @Test
+        @DisplayName("SP-09: VARCHAR 값에 쉼표 포함 - 그룹 2개로 분리")
+        fun `INSERT with comma inside quoted VARCHAR splits into correct groups`() {
+            val response = processRequest("INSERT INTO users VALUES (id=1, name='Alice, Bob'), (id=2, name='C')")
+
+            assertTrue(response.success)
+            assertEquals("Data inserted (2 rows)", response.message)
+            val rows = sharedTableService.select("users")!!.rows
+            assertEquals(2, rows.size)
+            assertEquals("Alice, Bob", rows[0]["name"])
+        }
+
+        @Test
+        @DisplayName("SP-10: VARCHAR 값에 괄호 포함 - 그룹 2개로 분리")
+        fun `INSERT with parenthesis inside quoted VARCHAR splits into correct groups`() {
+            val response = processRequest("INSERT INTO users VALUES (id=1, name='(test)'), (id=2, name='ok')")
+
+            assertTrue(response.success)
+            assertEquals("Data inserted (2 rows)", response.message)
+            val rows = sharedTableService.select("users")!!.rows
+            assertEquals(2, rows.size)
+            assertEquals("(test)", rows[0]["name"])
+        }
+
+        @Test
+        @DisplayName("SP-11: 세 가지 따옴표 형식(쌍따옴표/홑따옴표/없음) 혼재 파싱")
+        fun `INSERT with mixed quote styles parses all values correctly`() {
+            val response = processRequest("INSERT INTO users VALUES (id=1, name=\"d\"), (id=2, name='s'), (id=3, name=p)")
+
+            assertTrue(response.success)
+            assertEquals("Data inserted (3 rows)", response.message)
+            val rows = sharedTableService.select("users")!!.rows
+            assertEquals(3, rows.size)
+            assertEquals("d", rows[0]["name"])
+            assertEquals("s", rows[1]["name"])
+            assertEquals("p", rows[2]["name"])
+        }
+
+        @Test
+        @DisplayName("SP-12: VALUES 키워드 누락 구문은 400 응답")
+        fun `INSERT without VALUES keyword returns 400 error`() {
+            val response = processRequest("INSERT INTO users (id=1)")
+
+            assertFalse(response.success)
+            assertEquals(400, response.errorCode)
         }
     }
 
