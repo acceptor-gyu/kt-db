@@ -1215,4 +1215,128 @@ class TableServiceTest {
             assertThat(result!!.rows.map { it["id"] }).containsExactly("9", "8", "7")
         }
     }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Phase 2 DML 확장 테스트
+    // ──────────────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("UPDATE 테스트")
+    inner class UpdateTest {
+
+        @BeforeEach
+        fun setupTable() {
+            tableService.createTable("users", mapOf("id" to "INT", "name" to "VARCHAR"))
+            tableService.insert("users", mapOf("id" to "1", "name" to "Alice"))
+            tableService.insert("users", mapOf("id" to "2", "name" to "Bob"))
+            tableService.insert("users", mapOf("id" to "3", "name" to "Charlie"))
+        }
+
+        @Test
+        @DisplayName("U-01: WHERE 조건에 맞는 단일 행 업데이트")
+        fun updateSingleRowMatchingWhereConditionTest() {
+            val updatedCount = tableService.update("users", mapOf("name" to "Bobby"), "id=2")
+
+            assertEquals(1, updatedCount)
+            val rows = tableService.select("users")!!.rows
+            assertTrue(rows.any { it["id"] == "2" && it["name"] == "Bobby" })
+            assertTrue(rows.any { it["id"] == "1" && it["name"] == "Alice" })
+            assertTrue(rows.any { it["id"] == "3" && it["name"] == "Charlie" })
+        }
+
+        @Test
+        @DisplayName("U-02: WHERE 없이 전체 행 업데이트")
+        fun updateAllRowsWhenNoWhereClauseGivenTest() {
+            val updatedCount = tableService.update("users", mapOf("name" to "X"), null)
+
+            assertEquals(3, updatedCount)
+            val rows = tableService.select("users")!!.rows
+            assertTrue(rows.all { it["name"] == "X" })
+        }
+
+        @Test
+        @DisplayName("U-03: WHERE 매칭 없을 때 0 반환, 예외 없이 성공")
+        fun updateReturnsZeroWhenNoRowsMatchWhereConditionTest() {
+            val updatedCount = tableService.update("users", mapOf("name" to "Ghost"), "id=99")
+
+            assertEquals(0, updatedCount)
+            val rows = tableService.select("users")!!.rows
+            assertTrue(rows.any { it["id"] == "1" && it["name"] == "Alice" })
+            assertTrue(rows.any { it["id"] == "2" && it["name"] == "Bob" })
+        }
+
+        @Test
+        @DisplayName("U-04: 존재하지 않는 컬럼 SET 시 ColumnNotFoundException")
+        fun updateThrowsColumnNotFoundExceptionWhenSetColumnDoesNotExistTest() {
+            assertThrows<ColumnNotFoundException> {
+                tableService.update("users", mapOf("unknown" to "value"), null)
+            }
+        }
+
+        @Test
+        @DisplayName("U-05: INT 컬럼에 비정수 값 SET 시 TypeMismatchException")
+        fun updateThrowsTypeMismatchExceptionWhenIntColumnReceivesNonIntegerValueTest() {
+            assertThrows<TypeMismatchException> {
+                tableService.update("users", mapOf("id" to "not-a-number"), null)
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("INSERT 다중 행 테스트")
+    inner class InsertBatchTest {
+
+        @BeforeEach
+        fun setupTable() {
+            tableService.createTable("users", mapOf("id" to "INT", "name" to "VARCHAR"))
+        }
+
+        @Test
+        @DisplayName("B-01: 다중 행 삽입 기본 동작")
+        fun insertBatchInsertsAllRowsSuccessfullyTest() {
+            val rows = listOf(
+                mapOf("id" to "1", "name" to "Alice"),
+                mapOf("id" to "2", "name" to "Bob"),
+                mapOf("id" to "3", "name" to "Charlie"),
+            )
+
+            assertDoesNotThrow { tableService.insertBatch("users", rows) }
+
+            val result = tableService.select("users")!!.rows
+            assertEquals(3, result.size)
+            assertTrue(result.any { it["id"] == "1" && it["name"] == "Alice" })
+            assertTrue(result.any { it["id"] == "2" && it["name"] == "Bob" })
+            assertTrue(result.any { it["id"] == "3" && it["name"] == "Charlie" })
+        }
+
+        @Test
+        @DisplayName("B-02: 원자성 — 마지막 행 타입 오류 시 전체 실패")
+        fun insertBatchRollsBackAllRowsWhenLastRowHasTypeMismatchTest() {
+            val rows = listOf(
+                mapOf("id" to "1", "name" to "Alice"),
+                mapOf("id" to "bad", "name" to "Bob"),
+            )
+
+            assertThrows<TypeMismatchException> {
+                tableService.insertBatch("users", rows)
+            }
+            val result = tableService.select("users")!!.rows
+            assertEquals(0, result.size)
+        }
+
+        @Test
+        @DisplayName("B-03: 원자성 — 첫 번째 행 타입 오류 시 전체 실패")
+        fun insertBatchRollsBackAllRowsWhenFirstRowHasTypeMismatchTest() {
+            val rows = listOf(
+                mapOf("id" to "bad", "name" to "Alice"),
+                mapOf("id" to "2", "name" to "Bob"),
+            )
+
+            assertThrows<TypeMismatchException> {
+                tableService.insertBatch("users", rows)
+            }
+            val result = tableService.select("users")!!.rows
+            assertEquals(0, result.size)
+        }
+    }
 }
