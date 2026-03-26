@@ -1,7 +1,7 @@
 ---
 name: test-planner
 description: "기능 구현 후 테스트 계획 및 시나리오를 세울 때"
-model: sonnet
+model: opus
 color: blue
 memory: project
 ---

@@ -318,6 +318,7 @@ class ConnectionHandler(
             trimmedSql.startsWith("SELECT", ignoreCase = true) -> parseAndHandleSelect(trimmedSql)
             trimmedSql.startsWith("DELETE", ignoreCase = true) -> parseAndHandleDelete(trimmedSql)
             trimmedSql.startsWith("DROP TABLE", ignoreCase = true) -> parseAndHandleDropTable(trimmedSql)
+            trimmedSql.startsWith("UPDATE", ignoreCase = true) -> parseAndHandleUpdate(trimmedSql)
             trimmedSql.startsWith("VACUUM", ignoreCase = true) -> parseAndHandleVacuum(trimmedSql)
             trimmedSql.startsWith("EXPLAIN", ignoreCase = true) -> parseAndHandleExplain(trimmedSql)
             else -> DbResponse(success = false, message = "Unsupported SQL query: $sql", errorCode = 400)
@@ -356,19 +357,93 @@ class ConnectionHandler(
 
     /**
      * INSERT INTO users VALUES (id="1", name="John")
+     * INSERT INTO users VALUES (id=1, name='A'), (id=2, name='B')
      */
     private fun parseAndHandleInsert(sql: String): DbResponse {
-        val regex = Regex("""INSERT\s+INTO\s+(\w+)\s+VALUES\s*\(([^)]+)\)""", RegexOption.IGNORE_CASE)
+        val regex = Regex("""INSERT\s+INTO\s+(\w+)\s+VALUES\s*(.+)""", RegexOption.IGNORE_CASE)
         val match = regex.find(sql)
             ?: return DbResponse(success = false, message = "Invalid INSERT syntax: $sql", errorCode = 400)
 
         val tableName = match.groupValues[1]
-        val valuesPart = match.groupValues[2]
+        val valuesStr = match.groupValues[2].trim()
 
-        // Parse values: id="1", name="John"
+        val groups = extractValueGroups(valuesStr)
+        if (groups.isEmpty()) {
+            return DbResponse(success = false, message = "Invalid INSERT syntax: $sql", errorCode = 400)
+        }
+
+        val rows = groups.map { parseRowValues(it) }
+
+        return ExceptionMapper.executeWithExceptionHandling(connectionId) {
+            if (rows.size == 1) {
+                tableService.insert(tableName, rows[0])
+                DbResponse(success = true, message = "Data inserted")
+            } else {
+                tableService.insertBatch(tableName, rows)
+                DbResponse(success = true, message = "Data inserted (${rows.size} rows)")
+            }
+        }
+    }
+
+    /**
+     * VALUES 문자열에서 (...)  단위 그룹을 추출하는 상태 기반 토크나이저
+     *
+     * 따옴표 내의 콤마/괄호는 무시하고, 괄호 depth를 기준으로 그룹을 분리한다.
+     *
+     * @param valuesStr VALUES 이후 전체 문자열 (예: "(id=1, name='A'), (id=2, name='B')")
+     * @return 각 괄호 그룹의 내용 목록 (괄호 제외)
+     */
+    private fun extractValueGroups(valuesStr: String): List<String> {
+        val groups = mutableListOf<String>()
+        var depth = 0
+        var inQuote = false
+        var quoteChar = ' '
+        val current = StringBuilder()
+
+        for (ch in valuesStr) {
+            when {
+                inQuote -> {
+                    if (ch == quoteChar) {
+                        inQuote = false
+                    }
+                    if (depth == 1) current.append(ch)
+                }
+                ch == '\'' || ch == '"' -> {
+                    inQuote = true
+                    quoteChar = ch
+                    if (depth == 1) current.append(ch)
+                }
+                ch == '(' -> {
+                    depth++
+                    if (depth == 1) current.clear()
+                    else current.append(ch)
+                }
+                ch == ')' -> {
+                    depth--
+                    if (depth == 0) {
+                        groups.add(current.toString())
+                        current.clear()
+                    } else {
+                        current.append(ch)
+                    }
+                }
+                depth == 1 -> current.append(ch)
+            }
+        }
+
+        return groups
+    }
+
+    /**
+     * 괄호 내 col=val 문자열을 파싱하여 Map으로 반환
+     *
+     * @param group 괄호 안의 문자열 (예: "id=1, name='John'")
+     * @return 컬럼명 -> 값 매핑
+     */
+    private fun parseRowValues(group: String): Map<String, String> {
         val values = mutableMapOf<String, String>()
         val valueRegex = Regex("""(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s,)]+))""")
-        valueRegex.findAll(valuesPart).forEach { valueMatch ->
+        valueRegex.findAll(group).forEach { valueMatch ->
             val columnName = valueMatch.groupValues[1]
             val value = valueMatch.groupValues[2].ifEmpty {
                 valueMatch.groupValues[3].ifEmpty {
@@ -377,11 +452,7 @@ class ConnectionHandler(
             }
             values[columnName] = value
         }
-
-        return ExceptionMapper.executeWithExceptionHandling(connectionId) {
-            tableService.insert(tableName, values)
-            DbResponse(success = true, message = "Data inserted")
-        }
+        return values
     }
 
     /**
@@ -480,6 +551,44 @@ class ConnectionHandler(
                 message = "Query plan generated successfully",
                 data = queryPlanJson
             )
+        }
+    }
+
+    /**
+     * UPDATE users SET name='Bob' WHERE id=1
+     * UPDATE users SET age=25, status='active'
+     * UPDATE users SET name='Alice'  -- WHERE 없이 전체 업데이트
+     */
+    private fun parseAndHandleUpdate(sql: String): DbResponse {
+        val regex = Regex("""UPDATE\s+(\w+)\s+SET\s+(.+?)(?:\s+WHERE\s+(.+))?$""", RegexOption.IGNORE_CASE)
+        val match = regex.find(sql)
+            ?: return DbResponse(success = false, message = "Invalid UPDATE syntax: $sql", errorCode = 400)
+
+        val tableName = match.groupValues[1]
+        val setPart = match.groupValues[2]
+        val whereString = match.groupValues[3].trim().ifEmpty { null }
+
+        // SET 절 파싱: col=val 쌍을 Map으로 추출
+        // "val", 'val', 또는 따옴표 없는 val 형태 모두 지원
+        val setValues = mutableMapOf<String, String>()
+        val valueRegex = Regex("""(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s,]+))""")
+        valueRegex.findAll(setPart).forEach { valueMatch ->
+            val columnName = valueMatch.groupValues[1]
+            val value = valueMatch.groupValues[2].ifEmpty {
+                valueMatch.groupValues[3].ifEmpty {
+                    valueMatch.groupValues[4]
+                }
+            }
+            setValues[columnName] = value
+        }
+
+        if (setValues.isEmpty() || setPart.trim().startsWith("WHERE", ignoreCase = true)) {
+            return DbResponse(success = false, message = "Invalid UPDATE syntax: no SET values found in: $sql", errorCode = 400)
+        }
+
+        return ExceptionMapper.executeWithExceptionHandling(connectionId) {
+            val updatedCount = tableService.update(tableName, setValues, whereString)
+            DbResponse(success = true, message = "Updated $updatedCount row(s)")
         }
     }
 

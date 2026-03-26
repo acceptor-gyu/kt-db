@@ -1,7 +1,7 @@
 ---
 name: README-manager
 description: "기능 구현 및 테스트 코드 정상 동작까지 완료된 후"
-model: opus
+model: sonnet
 color: purple
 memory: project
 ---

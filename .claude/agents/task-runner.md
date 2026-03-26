@@ -1,7 +1,7 @@
 ---
 name: task-runner
 description: "요구사항 분석과 계획이 세워진 후 코드를 구현할 때"
-model: opus
+model: sonnet
 color: yellow
 memory: project
 ---

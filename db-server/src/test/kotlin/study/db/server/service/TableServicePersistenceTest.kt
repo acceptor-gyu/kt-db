@@ -258,6 +258,127 @@ class TableServicePersistenceTest {
     }
 
     @Nested
+    @DisplayName("파일 기반 UPDATE 테스트")
+    inner class UpdatePersistenceTest {
+
+        @BeforeEach
+        fun setupTable() {
+            tableService.createTable("users", mapOf("id" to "INT", "name" to "VARCHAR"))
+            tableService.insert("users", mapOf("id" to "1", "name" to "Alice"))
+            tableService.insert("users", mapOf("id" to "2", "name" to "Bob"))
+            tableService.insert("users", mapOf("id" to "3", "name" to "Charlie"))
+        }
+
+        @Test
+        @DisplayName("UP-01: UPDATE 후 파일에 변경 반영")
+        fun `update reflects changes in file directly`() {
+            tableService.update("users", mapOf("name" to "Bobby"), "id=2")
+
+            val loaded = tableFileManager.readTable("users")
+            assertNotNull(loaded)
+            assertTrue(loaded!!.rows.any { it["id"] == "2" && it["name"] == "Bobby" })
+            assertTrue(loaded.rows.any { it["id"] == "1" && it["name"] == "Alice" })
+        }
+
+        @Test
+        @DisplayName("UP-02: UPDATE 후 재시작 시 변경 유지")
+        fun `update persists after server restart`() {
+            tableService.update("users", mapOf("name" to "Bobby"), "id=2")
+
+            val newTableService = TableService(tableFileManager)
+            val result = newTableService.select("users")
+
+            assertNotNull(result)
+            assertTrue(result!!.rows.any { it["id"] == "2" && it["name"] == "Bobby" })
+            assertTrue(result.rows.any { it["id"] == "1" && it["name"] == "Alice" })
+        }
+
+        @Test
+        @DisplayName("UP-03: WHERE 없는 전체 UPDATE 파일 반영")
+        fun `full update without WHERE reflects all rows in file`() {
+            tableService.update("users", mapOf("name" to "Everyone"), null)
+
+            val loaded = tableFileManager.readTable("users")
+            assertNotNull(loaded)
+            assertEquals(3, loaded!!.rows.size)
+            assertTrue(loaded.rows.all { it["name"] == "Everyone" })
+        }
+
+        @Test
+        @DisplayName("UP-04: tombstone 행은 UPDATE 미적용")
+        fun `update skips tombstone rows`() {
+            tableService.delete("users", "id=3")
+
+            val updatedCount = tableService.update("users", mapOf("name" to "X"), null)
+
+            assertEquals(2, updatedCount)
+            val stats = tableFileManager.getTableStatistics("users")
+            assertNotNull(stats)
+            assertEquals(1, stats!!.deletedRows)
+        }
+    }
+
+    @Nested
+    @DisplayName("파일 기반 INSERT BATCH 테스트")
+    inner class InsertBatchPersistenceTest {
+
+        @BeforeEach
+        fun setupTable() {
+            tableService.createTable("users", mapOf("id" to "INT", "name" to "VARCHAR"))
+        }
+
+        @Test
+        @DisplayName("BP-01: insertBatch 후 파일에 저장")
+        fun `insertBatch saves all rows to file`() {
+            val rows = listOf(
+                mapOf("id" to "1", "name" to "Alice"),
+                mapOf("id" to "2", "name" to "Bob"),
+                mapOf("id" to "3", "name" to "Charlie"),
+            )
+            tableService.insertBatch("users", rows)
+
+            val loaded = tableFileManager.readTable("users")
+            assertNotNull(loaded)
+            assertEquals(3, loaded!!.rows.size)
+            assertEquals("Alice", loaded.rows[0]["name"])
+            assertEquals("Bob", loaded.rows[1]["name"])
+            assertEquals("Charlie", loaded.rows[2]["name"])
+        }
+
+        @Test
+        @DisplayName("BP-02: insertBatch 후 재시작 시 복원")
+        fun `insertBatch data survives server restart`() {
+            val rows = listOf(
+                mapOf("id" to "1", "name" to "Alice"),
+                mapOf("id" to "2", "name" to "Bob"),
+            )
+            tableService.insertBatch("users", rows)
+
+            val newTableService = TableService(tableFileManager)
+            val result = newTableService.select("users")
+
+            assertNotNull(result)
+            assertEquals(2, result!!.rows.size)
+            assertEquals("Alice", result.rows[0]["name"])
+            assertEquals("Bob", result.rows[1]["name"])
+        }
+
+        @Test
+        @DisplayName("BP-03: 대용량 insertBatch (100행)")
+        fun `insertBatch handles 100 rows correctly`() {
+            val rows = (1..100).map { i -> mapOf("id" to "$i", "name" to "user$i") }
+            tableService.insertBatch("users", rows)
+
+            val loaded = tableFileManager.readTable("users")
+            assertNotNull(loaded)
+            assertEquals(100, loaded!!.rows.size)
+            assertEquals("user1", loaded.rows[0]["name"])
+            assertEquals("user50", loaded.rows[49]["name"])
+            assertEquals("user100", loaded.rows[99]["name"])
+        }
+    }
+
+    @Nested
     @DisplayName("파일 기반 DELETE 테스트")
     inner class DeletePersistenceTest {
 

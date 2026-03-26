@@ -618,6 +618,48 @@ class TableFileManager(
     }
 
     /**
+     * 조건에 맞는 행을 업데이트
+     *
+     * WHERE 조건에 맞는 행의 필드 값을 업데이트하고 version을 증가시킵니다.
+     * WhereEvaluator를 사용하여 타입 기반 비교를 지원합니다.
+     *
+     * @param tableName 테이블 이름
+     * @param schema 테이블 스키마
+     * @param setValues SET 절에서 지정된 컬럼명 -> 값 매핑
+     * @param whereClause WHERE 조건 (WhereClause.None이면 전체 업데이트)
+     * @return 업데이트된 행 개수
+     */
+    fun updateRows(
+        tableName: String,
+        schema: Map<String, String>,
+        setValues: Map<String, String>,
+        whereClause: WhereClause
+    ): Int {
+        // 1. 모든 Row 읽기 (deleted 포함)
+        val (_, allRows) = readTableWithRows(tableName)
+            ?: return 0
+
+        // 2. 조건에 맞는 Row를 update()
+        var updatedCount = 0
+        val newRows = allRows.map { row ->
+            if (!row.deleted && WhereEvaluator.matches(row, whereClause, schema)) {
+                updatedCount++
+                row.update(setValues)  // version +1, data 업데이트
+            } else {
+                row
+            }
+        }
+
+        // 3. 파일에 저장
+        if (updatedCount > 0) {
+            writeTableWithRows(tableName, schema, newRows)
+            logger.info("Updated $updatedCount row(s) in table '$tableName'")
+        }
+
+        return updatedCount
+    }
+
+    /**
      * 테이블 통계 정보 조회
      *
      * VACUUM 실행 여부를 판단하기 위한 통계를 계산합니다.

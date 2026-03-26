@@ -1,7 +1,7 @@
 ---
 name: test-runner
 description: "test-planner agents 작업이 완료된 후 테스트 코드 작성 및 실행할 때"
-model: opus
+model: sonnet
 color: green
 memory: project
 ---
@@ -45,6 +45,9 @@ memory: project
   - 구현 코드를 수정하지 않는다.
   - 테스트 케이스를 임의로 변경하지 않는다.
   - 요구사항을 변경하지 않는다.
+  - 테스트 코드 내 메서드 이름은 영어로 작성한다.
+  - 단위 테스트는 소스 코드에서 사용한 메서드 명을 이용해 ~~Test로 작성한다.
+  - @DisplayName 어노테이션을 활용해 해당 테스트에 대한 설명을 작성한다.
 
 # Persistent Agent Memory
 
